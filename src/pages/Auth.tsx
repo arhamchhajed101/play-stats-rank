@@ -39,40 +39,55 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+        const { data, error } = await supabase.functions.invoke("auth-password", {
+          body: { action: "login", email, password },
         });
-
         if (error) throw error;
+
+        const sessionData = (data as any)?.data;
+        if (sessionData?.access_token && sessionData?.refresh_token) {
+          const { error: setSessionError } = await supabase.auth.setSession({
+            access_token: sessionData.access_token,
+            refresh_token: sessionData.refresh_token,
+          });
+          if (setSessionError) throw setSessionError;
+        }
 
         toast({
           title: "Welcome back!",
           description: "Successfully logged in.",
         });
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: {
-              username,
-            },
+        const { data, error } = await supabase.functions.invoke("auth-password", {
+          body: {
+            action: "signup",
+            email,
+            password,
+            username,
+            // Safer default: return to app origin; app will navigate after session is established
+            redirectTo: window.location.origin,
           },
         });
-
         if (error) throw error;
+
+        // If email confirmation is required, there may be no session yet.
+        const sessionData = (data as any)?.data;
+        if (sessionData?.access_token && sessionData?.refresh_token) {
+          await supabase.auth.setSession({
+            access_token: sessionData.access_token,
+            refresh_token: sessionData.refresh_token,
+          });
+        }
 
         toast({
           title: "Account created!",
-          description: "Welcome to Gamers Tag.",
+          description: "Check your email to confirm your account, then sign in.",
         });
       }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to fetch",
         variant: "destructive",
       });
     } finally {
