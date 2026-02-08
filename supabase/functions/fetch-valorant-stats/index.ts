@@ -8,6 +8,14 @@ const corsHeaders = {
 
 const HENRIK_API_BASE = "https://api.henrikdev.xyz";
 
+const getHenrikHeaders = (): Record<string, string> => {
+  const apiKey = Deno.env.get("HENRIK_API_KEY");
+  if (apiKey) {
+    return { "Authorization": apiKey };
+  }
+  return {};
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -56,11 +64,39 @@ Deno.serve(async (req) => {
     }
 
     // Fetch account info
-    const accountRes = await fetch(`${HENRIK_API_BASE}/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
-    const accountData = await accountRes.json();
+    const accountUrl = `${HENRIK_API_BASE}/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+    console.log("Fetching account:", accountUrl);
+    const accountRes = await fetch(accountUrl, { headers: getHenrikHeaders() });
+    const accountText = await accountRes.text();
+    console.log("Account API response status:", accountRes.status, "body:", accountText);
+    
+    let accountData;
+    try {
+      accountData = JSON.parse(accountText);
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid response from Valorant API", details: accountText.slice(0, 200) }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    if (accountData.status !== 200) {
-      return new Response(JSON.stringify({ error: "Player not found. Check your Riot ID." }), {
+    if (!accountRes.ok && accountRes.status !== 200) {
+      return new Response(JSON.stringify({ 
+        error: "Player not found. Check your Riot ID.", 
+        apiStatus: accountRes.status,
+        apiError: accountData?.errors || accountData?.message || accountData 
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (accountData.status && accountData.status !== 200) {
+      return new Response(JSON.stringify({ 
+        error: "Player not found. Check your Riot ID.",
+        apiStatus: accountData.status,
+        apiError: accountData?.errors || accountData?.message
+      }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -70,11 +106,11 @@ Deno.serve(async (req) => {
     const region = accountData.data.region || "eu";
 
     // Fetch MMR data
-    const mmrRes = await fetch(`${HENRIK_API_BASE}/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`);
+    const mmrRes = await fetch(`${HENRIK_API_BASE}/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`, { headers: getHenrikHeaders() });
     const mmrData = await mmrRes.json();
 
     // Fetch match history (last 5 competitive matches)
-    const matchesRes = await fetch(`${HENRIK_API_BASE}/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?mode=competitive&size=5`);
+    const matchesRes = await fetch(`${HENRIK_API_BASE}/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?mode=competitive&size=5`, { headers: getHenrikHeaders() });
     const matchesData = await matchesRes.json();
 
     // Calculate stats from matches
