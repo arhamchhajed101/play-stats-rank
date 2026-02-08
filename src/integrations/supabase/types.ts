@@ -70,18 +70,21 @@ export type Database = {
           added_at: string | null
           game_id: string
           id: string
+          ingame_id: string | null
           user_id: string
         }
         Insert: {
           added_at?: string | null
           game_id: string
           id?: string
+          ingame_id?: string | null
           user_id: string
         }
         Update: {
           added_at?: string | null
           game_id?: string
           id?: string
+          ingame_id?: string | null
           user_id?: string
         }
         Relationships: [
