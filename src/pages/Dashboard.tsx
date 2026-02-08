@@ -8,6 +8,7 @@ import { Trophy, Clock, Target, TrendingUp, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import GameCard from "@/components/GameCard";
+import ValorantTracker from "@/components/ValorantTracker";
 
 const Dashboard = () => {
   const [user, setUser] = useState<any>(null);
@@ -200,6 +201,22 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {trackedGames.some((tg) => tg.games?.name === "Valorant") && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">Valorant Stats</h2>
+            <ValorantTracker
+              savedIngameId={trackedGames.find((tg) => tg.games?.name === "Valorant")?.ingame_id || ""}
+              onSaveIngameId={async (id) => {
+                const tg = trackedGames.find((t) => t.games?.name === "Valorant");
+                if (tg) {
+                  await supabase.from("user_games").update({ ingame_id: id }).eq("id", tg.id);
+                  fetchTrackedGames(user.id);
+                }
+              }}
+            />
+          </div>
+        )}
 
         <div>
           <h2 className="text-2xl font-bold mb-4">Available Games</h2>
