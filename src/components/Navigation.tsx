@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Gamepad2, Home, Trophy, LogOut } from "lucide-react";
+import { Gamepad2, Home, Trophy, LogOut, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,6 +43,15 @@ const Navigation = () => {
               <Link to="/dashboard">
                 <Home className="h-4 w-4 mr-2" />
                 Dashboard
+              </Link>
+            </Button>
+            <Button
+              variant={location.pathname === "/profile" ? "default" : "ghost"}
+              asChild
+            >
+              <Link to="/profile">
+                <User className="h-4 w-4 mr-2" />
+                Profile
               </Link>
             </Button>
             <Button
