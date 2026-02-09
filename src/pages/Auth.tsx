@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Gamepad2 } from "lucide-react";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -38,7 +38,20 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === "forgot") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast({
+          title: "Check your email",
+          description: "We sent you a password reset link.",
+        });
+        setMode("login");
+        return;
+      }
+
+      if (mode === "login") {
         const { data, error } = await supabase.functions.invoke("auth-password", {
           body: { action: "login", email, password },
         });
@@ -64,13 +77,11 @@ const Auth = () => {
             email,
             password,
             username,
-            // Safer default: return to app origin; app will navigate after session is established
             redirectTo: window.location.origin,
           },
         });
         if (error) throw error;
 
-        // If email confirmation is required, there may be no session yet.
         const sessionData = (data as any)?.data;
         if (sessionData?.access_token && sessionData?.refresh_token) {
           await supabase.auth.setSession({
@@ -103,15 +114,15 @@ const Auth = () => {
             <Gamepad2 className="h-12 w-12 text-primary" style={{ filter: "drop-shadow(var(--shadow-glow))" }} />
           </div>
           <CardTitle className="text-2xl text-center">
-            {isLogin ? "Welcome Back" : "Join Gamers Tag"}
+            {mode === "login" ? "Welcome Back" : mode === "signup" ? "Join Gamers Tag" : "Reset Password"}
           </CardTitle>
           <CardDescription className="text-center">
-            {isLogin ? "Sign in to track your gaming stats" : "Create an account to start tracking"}
+            {mode === "login" ? "Sign in to track your gaming stats" : mode === "signup" ? "Create an account to start tracking" : "Enter your email to receive a reset link"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAuth} className="space-y-4">
-            {!isLogin && (
+            {mode === "signup" && (
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <Input
@@ -119,7 +130,7 @@ const Auth = () => {
                   placeholder="ProGamer123"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  required={!isLogin}
+                  required
                 />
               </div>
             )}
@@ -134,28 +145,37 @@ const Auth = () => {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            {mode !== "forgot" && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+            {mode === "login" && (
+              <div className="text-right">
+                <button type="button" onClick={() => setMode("forgot")} className="text-sm text-muted-foreground hover:text-primary hover:underline">
+                  Forgot password?
+                </button>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
+              {loading ? "Loading..." : mode === "login" ? "Sign In" : mode === "signup" ? "Sign Up" : "Send Reset Link"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => setMode(mode === "login" ? "signup" : "login")}
               className="text-primary hover:underline"
             >
-              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+              {mode === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
             </button>
           </div>
         </CardContent>
