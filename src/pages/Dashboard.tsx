@@ -98,9 +98,16 @@ const Dashboard = () => {
       const res = await supabase.functions.invoke("fetch-valorant-stats", {
         body: { ingame_id: ingameId },
       });
+
+      if (res.error) {
+        throw new Error(res.error.message);
+      }
+
       if (res.data?.error) {
-        toast({ title: "Stats fetch issue", description: res.data.error, variant: "destructive" });
-      } else if (res.data) {
+        throw new Error(res.data.error);
+      }
+
+      if (res.data) {
         toast({ title: "Stats synced!", description: `${res.data.rank} • K/D: ${res.data.recentStats.kd}` });
         await fetchStats(user.id);
       }

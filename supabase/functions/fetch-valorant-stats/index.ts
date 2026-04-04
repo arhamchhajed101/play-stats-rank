@@ -8,13 +8,111 @@ const corsHeaders = {
 
 const HENRIK_API_BASE = "https://api.henrikdev.xyz";
 
-const getHenrikHeaders = (): Record<string, string> => {
-  const apiKey = Deno.env.get("HENRIK_API_KEY");
-  if (apiKey) {
-    return { "Authorization": apiKey };
-  }
-  return {};
+type HenrikFetchResult = {
+  response: Response;
+  data: any;
+  authMode: "header" | "query";
+  url: string;
 };
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const parseJson = (text: string) => {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return { raw: text };
+  }
+};
+
+const getRequiredEnv = (name: string) => {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) throw new Error(`${name} is not configured`);
+  return value;
+};
+
+const getHenrikApiKey = () => Deno.env.get("HENRIK_API_KEY")?.trim() || "";
+
+const getHenrikErrorDetails = (data: any) => data?.errors || data?.message || data;
+
+const parseRiotId = (ingameId: string) => {
+  const separatorIndex = ingameId.indexOf("#");
+  if (separatorIndex === -1) return null;
+
+  const name = ingameId.slice(0, separatorIndex).trim();
+  const tag = ingameId.slice(separatorIndex + 1).trim();
+
+  if (!name || !tag) return null;
+  return { name, tag };
+};
+
+async function fetchHenrik(
+  path: string,
+  query: Record<string, string | number | boolean | undefined> = {},
+): Promise<HenrikFetchResult> {
+  const apiKey = getHenrikApiKey();
+
+  if (!apiKey) {
+    return {
+      response: new Response(JSON.stringify({ message: "HENRIK_API_KEY is not configured" }), { status: 500 }),
+      data: { message: "HENRIK_API_KEY is not configured" },
+      authMode: "header",
+      url: `${HENRIK_API_BASE}${path}`,
+    };
+  }
+
+  const attempts: Array<{ authMode: "header" | "query"; useHeader: boolean }> = [
+    { authMode: "header", useHeader: true },
+    { authMode: "query", useHeader: false },
+  ];
+
+  let lastResult: HenrikFetchResult | null = null;
+
+  for (const attempt of attempts) {
+    const url = new URL(`${HENRIK_API_BASE}${path}`);
+
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined) {
+        url.searchParams.set(key, String(value));
+      }
+    });
+
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+
+    if (attempt.useHeader) {
+      headers.Authorization = apiKey;
+    } else {
+      url.searchParams.set("api_key", apiKey);
+    }
+
+    const response = await fetch(url.toString(), { headers });
+    const text = await response.text();
+    const data = parseJson(text);
+
+    lastResult = {
+      response,
+      data,
+      authMode: attempt.authMode,
+      url: url.toString(),
+    };
+
+    console.log(
+      `Henrik ${attempt.authMode} request: ${response.status} ${url.pathname}${url.search ? "?" + url.searchParams.toString().replace(apiKey, "[redacted]") : ""}`,
+    );
+
+    if (response.status !== 401) {
+      return lastResult;
+    }
+  }
+
+  return lastResult!;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -22,203 +120,182 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseUrl = getRequiredEnv("SUPABASE_URL");
+    const supabaseServiceKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = getRequiredEnv("SUPABASE_ANON_KEY");
 
-    // Get user from auth header
     const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const userClient = createClient(supabaseUrl, anonKey, {
+    const token = authHeader.replace("Bearer ", "").trim();
+    const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    const userId = claimsData?.claims?.sub;
+
+    if (claimsError || !userId) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     const { ingame_id } = await req.json();
-    if (!ingame_id) {
-      return new Response(JSON.stringify({ error: "ingame_id is required (format: Name#Tag)" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!ingame_id || typeof ingame_id !== "string") {
+      return jsonResponse({ error: "ingame_id is required (format: Name#Tag)" }, 400);
     }
 
-    const [name, tag] = ingame_id.split("#");
-    if (!name || !tag) {
-      return new Response(JSON.stringify({ error: "Invalid format. Use Name#Tag" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const riotId = parseRiotId(ingame_id);
+    if (!riotId) {
+      return jsonResponse({ error: "Invalid format. Use Name#Tag" }, 400);
     }
 
-    // Fetch account info
-    const accountUrl = `${HENRIK_API_BASE}/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
-    console.log("Fetching account:", accountUrl);
-    const accountRes = await fetch(accountUrl, { headers: getHenrikHeaders() });
-    const accountText = await accountRes.text();
-    console.log("Account API response status:", accountRes.status, "body:", accountText);
-    
-    let accountData;
-    try {
-      accountData = JSON.parse(accountText);
-    } catch {
-      return new Response(JSON.stringify({ error: "Invalid response from Valorant API", details: accountText.slice(0, 200) }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const { name, tag } = riotId;
+    const accountResult = await fetchHenrik(
+      `/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
+      { force: true },
+    );
+
+    console.log("Fetching account:", accountResult.url.replace(getHenrikApiKey(), "[redacted]"));
+    console.log("Account API response status:", accountResult.response.status, "body:", JSON.stringify(accountResult.data));
+
+    if (accountResult.response.status === 401) {
+      return jsonResponse(
+        {
+          error: "Valorant provider authentication failed.",
+          apiStatus: 401,
+          apiError: getHenrikErrorDetails(accountResult.data),
+          hint: "Check the configured HENRIK_API_KEY.",
+        },
+        502,
+      );
     }
 
-    if (!accountRes.ok && accountRes.status !== 200) {
-      return new Response(JSON.stringify({ 
-        error: "Player not found. Check your Riot ID.", 
-        apiStatus: accountRes.status,
-        apiError: accountData?.errors || accountData?.message || accountData 
-      }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (accountResult.response.status === 404 || accountResult.data?.status === 404) {
+      return jsonResponse(
+        {
+          error: "Player not found. Check your Riot ID.",
+          apiStatus: accountResult.response.status,
+          apiError: getHenrikErrorDetails(accountResult.data),
+        },
+        404,
+      );
     }
 
-    if (accountData.status && accountData.status !== 200) {
-      return new Response(JSON.stringify({ 
-        error: "Player not found. Check your Riot ID.",
-        apiStatus: accountData.status,
-        apiError: accountData?.errors || accountData?.message
-      }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!accountResult.response.ok || !accountResult.data?.data) {
+      return jsonResponse(
+        {
+          error: "Failed to fetch player account.",
+          apiStatus: accountResult.response.status,
+          apiError: getHenrikErrorDetails(accountResult.data),
+        },
+        502,
+      );
     }
 
-    const puuid = accountData.data.puuid;
-    const region = accountData.data.region || "eu";
+    const affinity = accountResult.data.data.region || "eu";
+    const puuid = accountResult.data.data.puuid;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch MMR data
-    const mmrRes = await fetch(`${HENRIK_API_BASE}/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`, { headers: getHenrikHeaders() });
-    const mmrData = await mmrRes.json();
+    const [mmrResult, matchesResult, gameResult] = await Promise.all([
+      fetchHenrik(`/valorant/v2/mmr/${encodeURIComponent(affinity)}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`),
+      fetchHenrik(`/valorant/v3/matches/${encodeURIComponent(affinity)}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`, {
+        mode: "competitive",
+        size: 5,
+      }),
+      supabase.from("games").select("id").eq("name", "Valorant").single(),
+    ]);
 
-    // Fetch match history (last 5 competitive matches)
-    const matchesRes = await fetch(`${HENRIK_API_BASE}/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?mode=competitive&size=5`, { headers: getHenrikHeaders() });
-    const matchesData = await matchesRes.json();
+    if (mmrResult.response.status === 401 || matchesResult.response.status === 401) {
+      return jsonResponse(
+        {
+          error: "Valorant provider authentication failed.",
+          apiStatus: 401,
+          apiError: getHenrikErrorDetails(mmrResult.data) || getHenrikErrorDetails(matchesResult.data),
+          hint: "Check the configured HENRIK_API_KEY.",
+        },
+        502,
+      );
+    }
 
-    // Calculate stats from matches
+    if (gameResult.error || !gameResult.data) {
+      return jsonResponse({ error: "Valorant game not found in database" }, 500);
+    }
+
     let totalKills = 0;
     let totalDeaths = 0;
     let wins = 0;
     let losses = 0;
     let roundsPlayed = 0;
 
-    if (matchesData.status === 200 && matchesData.data) {
-      for (const match of matchesData.data) {
-        const player = match.players?.all_players?.find(
-          (p: any) => p.puuid === puuid
-        );
-        if (player) {
-          totalKills += player.stats?.kills || 0;
-          totalDeaths += player.stats?.deaths || 0;
-        }
+    if (matchesResult.response.ok && Array.isArray(matchesResult.data?.data)) {
+      for (const match of matchesResult.data.data) {
+        const player = match.players?.all_players?.find((p: any) => p.puuid === puuid);
+        if (!player) continue;
 
-        // Determine win/loss
-        const playerTeam = match.players?.all_players?.find(
-          (p: any) => p.puuid === puuid
-        )?.team?.toLowerCase();
+        totalKills += player.stats?.kills || 0;
+        totalDeaths += player.stats?.deaths || 0;
 
-        if (playerTeam && match.teams) {
-          const team = match.teams[playerTeam];
-          if (team) {
-            if (team.has_won) wins++;
-            else losses++;
-            roundsPlayed += (team.rounds_won || 0) + (team.rounds_lost || 0);
-          }
+        const playerTeam = player.team?.toLowerCase();
+        const team = playerTeam ? match.teams?.[playerTeam] : null;
+        if (team) {
+          if (team.has_won) wins += 1;
+          else losses += 1;
+          roundsPlayed += (team.rounds_won || 0) + (team.rounds_lost || 0);
         }
       }
     }
 
-    // Get Valorant game ID
-    const { data: gameData } = await supabase
-      .from("games")
-      .select("id")
-      .eq("name", "Valorant")
-      .single();
+    const currentRank = mmrResult.response.ok && mmrResult.data?.status === 200
+      ? mmrResult.data?.data?.current_data?.currenttierpatched || "Unranked"
+      : "Unranked";
 
-    if (!gameData) {
-      return new Response(JSON.stringify({ error: "Valorant game not found in database" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const elo = mmrResult.response.ok && mmrResult.data?.status === 200
+      ? mmrResult.data?.data?.current_data?.elo || 0
+      : 0;
 
     const today = new Date().toISOString().split("T")[0];
-
-    // Upsert stats for today
-    const { error: statsError } = await supabase
-      .from("user_stats")
-      .upsert(
-        {
-          user_id: user.id,
-          game_id: gameData.id,
-          date: today,
-          kills: totalKills,
-          deaths: totalDeaths,
-          wins,
-          losses,
-          points_earned: (wins * 20) + (totalKills * 2),
-          hours_played: roundsPlayed * 0.02, // rough estimate
-        },
-        { onConflict: "user_id,game_id,date" }
-      );
+    const { error: statsError } = await supabase.from("user_stats").upsert(
+      {
+        user_id: userId,
+        game_id: gameResult.data.id,
+        date: today,
+        kills: totalKills,
+        deaths: totalDeaths,
+        wins,
+        losses,
+        points_earned: wins * 20 + totalKills * 2,
+        hours_played: Number((roundsPlayed * 0.02).toFixed(2)),
+      },
+      { onConflict: "user_id,game_id,date" },
+    );
 
     if (statsError) {
       console.error("Stats upsert error:", statsError);
     }
 
-    const currentRank = mmrData.status === 200
-      ? mmrData.data?.current_data?.currenttierpatched || "Unranked"
-      : "Unranked";
-
-    const elo = mmrData.status === 200
-      ? mmrData.data?.current_data?.elo || 0
-      : 0;
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        account: {
-          name: accountData.data.name,
-          tag: accountData.data.tag,
-          level: accountData.data.account_level,
-          card: accountData.data.card?.small,
-        },
-        rank: currentRank,
-        elo,
-        recentStats: {
-          matches: matchesData.data?.length || 0,
-          kills: totalKills,
-          deaths: totalDeaths,
-          kd: totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills.toString(),
-          wins,
-          losses,
-        },
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      success: true,
+      account: {
+        name: accountResult.data.data.name,
+        tag: accountResult.data.data.tag,
+        level: accountResult.data.data.account_level,
+        card: accountResult.data.data.card?.small,
+      },
+      rank: currentRank,
+      elo,
+      recentStats: {
+        matches: Array.isArray(matchesResult.data?.data) ? matchesResult.data.data.length : 0,
+        kills: totalKills,
+        deaths: totalDeaths,
+        kd: totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills.toString(),
+        wins,
+        losses,
+      },
+    });
   } catch (error) {
     console.error("Error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
   }
 });
