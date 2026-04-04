@@ -12,6 +12,7 @@ interface GameCardProps {
   };
   isTracked: boolean;
   onToggle: () => void;
+  ingameId?: string;
 }
 
 const GameCard = ({ game, isTracked, onToggle }: GameCardProps) => {
