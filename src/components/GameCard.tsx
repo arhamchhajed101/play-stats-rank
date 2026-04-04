@@ -15,7 +15,7 @@ interface GameCardProps {
   ingameId?: string;
 }
 
-const GameCard = ({ game, isTracked, onToggle }: GameCardProps) => {
+const GameCard = ({ game, isTracked, onToggle, ingameId }: GameCardProps) => {
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden hover:border-primary/50 transition-colors group">
       <div className="aspect-video relative overflow-hidden">
