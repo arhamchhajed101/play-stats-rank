@@ -33,6 +33,9 @@ const GameCard = ({ game, isTracked, onToggle, ingameId }: GameCardProps) => {
             <Badge variant="secondary" className="mt-2">
               {game.category}
             </Badge>
+            {ingameId && (
+              <p className="text-xs text-muted-foreground mt-1 truncate">ID: {ingameId}</p>
+            )}
           </div>
         </div>
       </CardHeader>
