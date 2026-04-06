@@ -10,6 +10,7 @@ import GameCard from "@/components/GameCard";
 import TrackGameDialog from "@/components/TrackGameDialog";
 import CombinedStatsCard from "@/components/CombinedStatsCard";
 import ValorantTracker from "@/components/ValorantTracker";
+import GamerScoreCard from "@/components/GamerScoreCard";
 
 const Dashboard = () => {
   const [user, setUser] = useState<any>(null);
