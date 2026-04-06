@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Gamepad2, Trophy, Target, Brain, Shield, Users, Swords, Clock, BarChart3 } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import GamerScoreCard from "@/components/GamerScoreCard";
 import { motion } from "framer-motion";
 
 const skillData = [
