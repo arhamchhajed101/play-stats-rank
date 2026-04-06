@@ -10,6 +10,7 @@ import GameCard from "@/components/GameCard";
 import TrackGameDialog from "@/components/TrackGameDialog";
 import CombinedStatsCard from "@/components/CombinedStatsCard";
 import ValorantTracker from "@/components/ValorantTracker";
+import GamerScoreCard from "@/components/GamerScoreCard";
 
 const Dashboard = () => {
   const [user, setUser] = useState<any>(null);
@@ -244,11 +245,26 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Per-game + Combined Stats */}
+        {/* Gamer Score + Per-game Stats */}
         {gameStatsArray.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">Your Stats</h2>
-            <CombinedStatsCard gameStats={gameStatsArray} />
+          <div className="mb-8 space-y-6">
+            <h2 className="text-2xl font-bold">Your Stats</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <GamerScoreCard
+                  stats={{
+                    kills: totalKills,
+                    deaths: stats.reduce((s, st) => s + (st.deaths || 0), 0),
+                    wins: totalWins,
+                    losses: stats.reduce((s, st) => s + (st.losses || 0), 0),
+                    hoursPlayed: totalHours,
+                  }}
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <CombinedStatsCard gameStats={gameStatsArray} />
+              </div>
+            </div>
           </div>
         )}
 

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Gamepad2, Trophy, Target, Brain, Shield, Users, Swords, Clock, BarChart3 } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import GamerScoreCard from "@/components/GamerScoreCard";
 import { motion } from "framer-motion";
 
 const skillData = [
@@ -76,7 +77,9 @@ const Profile = () => {
   const gamerType = getGamerType(skills);
   const totalHours = stats.reduce((s, st) => s + parseFloat(st.hours_played || 0), 0);
   const totalKills = stats.reduce((s, st) => s + (st.kills || 0), 0);
+  const totalDeaths = stats.reduce((s, st) => s + (st.deaths || 0), 0);
   const totalWins = stats.reduce((s, st) => s + (st.wins || 0), 0);
+  const totalLosses = stats.reduce((s, st) => s + (st.losses || 0), 0);
 
   return (
     <div className="min-h-screen">
@@ -119,6 +122,18 @@ const Profile = () => {
               </div>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Gamer Score */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="mb-8"
+        >
+          <GamerScoreCard
+            stats={{ kills: totalKills, deaths: totalDeaths, wins: totalWins, losses: totalLosses, hoursPlayed: totalHours }}
+          />
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
