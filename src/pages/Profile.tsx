@@ -77,7 +77,9 @@ const Profile = () => {
   const gamerType = getGamerType(skills);
   const totalHours = stats.reduce((s, st) => s + parseFloat(st.hours_played || 0), 0);
   const totalKills = stats.reduce((s, st) => s + (st.kills || 0), 0);
+  const totalDeaths = stats.reduce((s, st) => s + (st.deaths || 0), 0);
   const totalWins = stats.reduce((s, st) => s + (st.wins || 0), 0);
+  const totalLosses = stats.reduce((s, st) => s + (st.losses || 0), 0);
 
   return (
     <div className="min-h-screen">
