@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,25 +9,55 @@ const corsHeaders = {
 
 const HENRIK_API_BASE = "https://api.henrikdev.xyz";
 
-type HenrikFetchResult = {
-  response: Response;
-  data: any;
-  authMode: "header" | "query";
-  url: string;
-};
+// ── Rate Limiting ──
 
-const jsonResponse = (body: unknown, status = 200) =>
+interface RateBucket { count: number; resetAt: number; }
+const rateLimitMap = new Map<string, RateBucket>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_PER_USER = 6;   // 6 requests/min per user
+const RATE_LIMIT_PER_IP = 15;    // 15 requests/min per IP
+
+function checkRateLimit(key: string, max: number): { allowed: boolean; retryAfterMs: number } {
+  const now = Date.now();
+  let bucket = rateLimitMap.get(key);
+  if (!bucket || now >= bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    rateLimitMap.set(key, bucket);
+  }
+  bucket.count++;
+  if (bucket.count > max) {
+    return { allowed: false, retryAfterMs: bucket.resetAt - now };
+  }
+  return { allowed: true, retryAfterMs: 0 };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateLimitMap) {
+    if (now >= bucket.resetAt) rateLimitMap.delete(key);
+  }
+}, 120_000);
+
+// ── Input Validation ──
+
+const requestBodySchema = z.object({
+  ingame_id: z.string()
+    .trim()
+    .min(3, "Riot ID too short")
+    .max(50, "Riot ID too long")
+    .regex(/^[^#]+#[^#]+$/, "Invalid format. Use Name#Tag"),
+}).strict();
+
+// ── Helpers ──
+
+const jsonResponse = (body: unknown, status = 200, extraHeaders: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...extraHeaders },
   });
 
 const parseJson = (text: string) => {
-  try {
-    return text ? JSON.parse(text) : null;
-  } catch {
-    return { raw: text };
-  }
+  try { return text ? JSON.parse(text) : null; } catch { return { raw: text }; }
 };
 
 const getRequiredEnv = (name: string) => {
@@ -36,26 +67,28 @@ const getRequiredEnv = (name: string) => {
 };
 
 const getHenrikApiKey = () => Deno.env.get("HENRIK_API_KEY")?.trim() || "";
-
 const getHenrikErrorDetails = (data: any) => data?.errors || data?.message || data;
+
+function getClientIp(req: Request): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+}
 
 const parseRiotId = (ingameId: string) => {
   const separatorIndex = ingameId.indexOf("#");
   if (separatorIndex === -1) return null;
-
   const name = ingameId.slice(0, separatorIndex).trim();
   const tag = ingameId.slice(separatorIndex + 1).trim();
-
   if (!name || !tag) return null;
   return { name, tag };
 };
+
+type HenrikFetchResult = { response: Response; data: any; authMode: "header" | "query"; url: string };
 
 async function fetchHenrik(
   path: string,
   query: Record<string, string | number | boolean | undefined> = {},
 ): Promise<HenrikFetchResult> {
   const apiKey = getHenrikApiKey();
-
   if (!apiKey) {
     return {
       response: new Response(JSON.stringify({ message: "HENRIK_API_KEY is not configured" }), { status: 500 }),
@@ -74,17 +107,11 @@ async function fetchHenrik(
 
   for (const attempt of attempts) {
     const url = new URL(`${HENRIK_API_BASE}${path}`);
-
     Object.entries(query).forEach(([key, value]) => {
-      if (value !== undefined) {
-        url.searchParams.set(key, String(value));
-      }
+      if (value !== undefined) url.searchParams.set(key, String(value));
     });
 
-    const headers: Record<string, string> = {
-      Accept: "application/json",
-    };
-
+    const headers: Record<string, string> = { Accept: "application/json" };
     if (attempt.useHeader) {
       headers.Authorization = apiKey;
     } else {
@@ -95,24 +122,19 @@ async function fetchHenrik(
     const text = await response.text();
     const data = parseJson(text);
 
-    lastResult = {
-      response,
-      data,
-      authMode: attempt.authMode,
-      url: url.toString(),
-    };
+    lastResult = { response, data, authMode: attempt.authMode, url: url.toString() };
 
     console.log(
-      `Henrik ${attempt.authMode} request: ${response.status} ${url.pathname}${url.search ? "?" + url.searchParams.toString().replace(apiKey, "[redacted]") : ""}`,
+      `Henrik ${attempt.authMode} request: ${response.status} ${url.pathname}`,
     );
 
-    if (response.status !== 401) {
-      return lastResult;
-    }
+    if (response.status !== 401) return lastResult;
   }
 
   return lastResult!;
 }
+
+// ── Main Handler ──
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -124,6 +146,7 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY");
     const anonKey = getRequiredEnv("SUPABASE_ANON_KEY");
 
+    // Auth check
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return jsonResponse({ error: "Unauthorized" }, 401);
@@ -141,11 +164,35 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
-    const { ingame_id } = await req.json();
-    if (!ingame_id || typeof ingame_id !== "string") {
-      return jsonResponse({ error: "ingame_id is required (format: Name#Tag)" }, 400);
+    // Rate limit: per-user + per-IP
+    const clientIp = getClientIp(req);
+    const userRL = checkRateLimit(`valorant:user:${userId}`, RATE_LIMIT_PER_USER);
+    const ipRL = checkRateLimit(`valorant:ip:${clientIp}`, RATE_LIMIT_PER_IP);
+
+    if (!userRL.allowed || !ipRL.allowed) {
+      const retryAfter = Math.max(userRL.retryAfterMs, ipRL.retryAfterMs);
+      return jsonResponse(
+        { error: "Too many requests. Please try again later." },
+        429,
+        { "Retry-After": String(Math.ceil(retryAfter / 1000)) },
+      );
     }
 
+    // Validate input
+    let rawBody: unknown;
+    try { rawBody = await req.json(); } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+
+    const parsed = requestBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return jsonResponse({
+        error: "Validation failed",
+        details: parsed.error.flatten().fieldErrors,
+      }, 400);
+    }
+
+    const { ingame_id } = parsed.data;
     const riotId = parseRiotId(ingame_id);
     if (!riotId) {
       return jsonResponse({ error: "Invalid format. Use Name#Tag" }, 400);
@@ -157,41 +204,28 @@ Deno.serve(async (req) => {
       { force: true },
     );
 
-    console.log("Fetching account:", accountResult.url.replace(getHenrikApiKey(), "[redacted]"));
-    console.log("Account API response status:", accountResult.response.status, "body:", JSON.stringify(accountResult.data));
+    console.log("Account API response status:", accountResult.response.status);
 
     if (accountResult.response.status === 401) {
-      return jsonResponse(
-        {
-          error: "Valorant provider authentication failed.",
-          apiStatus: 401,
-          apiError: getHenrikErrorDetails(accountResult.data),
-          hint: "Check the configured HENRIK_API_KEY.",
-        },
-        502,
-      );
+      return jsonResponse({
+        error: "Valorant provider authentication failed.",
+        apiStatus: 401,
+        hint: "Check the configured HENRIK_API_KEY.",
+      }, 502);
     }
 
     if (accountResult.response.status === 404 || accountResult.data?.status === 404) {
-      return jsonResponse(
-        {
-          error: "Player not found. Check your Riot ID.",
-          apiStatus: accountResult.response.status,
-          apiError: getHenrikErrorDetails(accountResult.data),
-        },
-        404,
-      );
+      return jsonResponse({
+        error: "Player not found. Check your Riot ID.",
+        apiStatus: accountResult.response.status,
+      }, 404);
     }
 
     if (!accountResult.response.ok || !accountResult.data?.data) {
-      return jsonResponse(
-        {
-          error: "Failed to fetch player account.",
-          apiStatus: accountResult.response.status,
-          apiError: getHenrikErrorDetails(accountResult.data),
-        },
-        502,
-      );
+      return jsonResponse({
+        error: "Failed to fetch player account.",
+        apiStatus: accountResult.response.status,
+      }, 502);
     }
 
     const affinity = accountResult.data.data.region || "eu";
@@ -208,40 +242,29 @@ Deno.serve(async (req) => {
     ]);
 
     if (mmrResult.response.status === 401 || matchesResult.response.status === 401) {
-      return jsonResponse(
-        {
-          error: "Valorant provider authentication failed.",
-          apiStatus: 401,
-          apiError: getHenrikErrorDetails(mmrResult.data) || getHenrikErrorDetails(matchesResult.data),
-          hint: "Check the configured HENRIK_API_KEY.",
-        },
-        502,
-      );
+      return jsonResponse({
+        error: "Valorant provider authentication failed.",
+        apiStatus: 401,
+        hint: "Check the configured HENRIK_API_KEY.",
+      }, 502);
     }
 
     if (gameResult.error || !gameResult.data) {
       return jsonResponse({ error: "Valorant game not found in database" }, 500);
     }
 
-    let totalKills = 0;
-    let totalDeaths = 0;
-    let wins = 0;
-    let losses = 0;
-    let roundsPlayed = 0;
+    let totalKills = 0, totalDeaths = 0, wins = 0, losses = 0, roundsPlayed = 0;
 
     if (matchesResult.response.ok && Array.isArray(matchesResult.data?.data)) {
       for (const match of matchesResult.data.data) {
         const player = match.players?.all_players?.find((p: any) => p.puuid === puuid);
         if (!player) continue;
-
         totalKills += player.stats?.kills || 0;
         totalDeaths += player.stats?.deaths || 0;
-
         const playerTeam = player.team?.toLowerCase();
         const team = playerTeam ? match.teams?.[playerTeam] : null;
         if (team) {
-          if (team.has_won) wins += 1;
-          else losses += 1;
+          if (team.has_won) wins += 1; else losses += 1;
           roundsPlayed += (team.rounds_won || 0) + (team.rounds_lost || 0);
         }
       }
@@ -271,9 +294,7 @@ Deno.serve(async (req) => {
       { onConflict: "user_id,game_id,date" },
     );
 
-    if (statsError) {
-      console.error("Stats upsert error:", statsError);
-    }
+    if (statsError) console.error("Stats upsert error:", statsError);
 
     return jsonResponse({
       success: true,
