@@ -37,5 +37,5 @@ export const ingameIdSchema = z
 export function getValidationError(schema: z.ZodSchema, value: unknown): string | null {
   const result = schema.safeParse(value);
   if (result.success) return null;
-  return result.error.errors[0]?.message || "Invalid input";
+  return result.error.issues[0]?.message || "Invalid input";
 }
