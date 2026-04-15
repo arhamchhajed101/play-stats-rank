@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RefreshCw, Search } from "lucide-react";
 import { useValorantStats } from "@/hooks/useValorantStats";
 import ValorantStatsCard from "./ValorantStatsCard";
+import { riotIdSchema, getValidationError } from "@/lib/validation";
+import { useToast } from "@/hooks/use-toast";
 
 interface ValorantTrackerProps {
   savedIngameId?: string;
@@ -14,12 +16,17 @@ interface ValorantTrackerProps {
 const ValorantTracker = ({ savedIngameId, onSaveIngameId }: ValorantTrackerProps) => {
   const [ingameId, setIngameId] = useState(savedIngameId || "");
   const { stats, loading, fetchStats } = useValorantStats();
+  const { toast } = useToast();
 
   const handleFetch = async () => {
-    if (!ingameId.includes("#")) return;
-    const result = await fetchStats(ingameId);
+    const err = getValidationError(riotIdSchema, ingameId);
+    if (err) {
+      toast({ title: "Invalid Riot ID", description: err, variant: "destructive" });
+      return;
+    }
+    const result = await fetchStats(ingameId.trim());
     if (result && onSaveIngameId) {
-      onSaveIngameId(ingameId);
+      onSaveIngameId(ingameId.trim());
     }
   };
 
