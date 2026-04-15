@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { emailSchema, passwordSchema, usernameSchema, getValidationError } from "@/lib/validation";
 import { Gamepad2 } from "lucide-react";
 
 const Auth = () => {
@@ -35,6 +36,21 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Client-side validation
+    const emailErr = getValidationError(emailSchema, email);
+    if (emailErr) { toast({ title: "Invalid email", description: emailErr, variant: "destructive" }); return; }
+
+    if (mode !== "forgot") {
+      const passErr = getValidationError(passwordSchema, password);
+      if (passErr) { toast({ title: "Invalid password", description: passErr, variant: "destructive" }); return; }
+    }
+
+    if (mode === "signup" && username) {
+      const userErr = getValidationError(usernameSchema, username);
+      if (userErr) { toast({ title: "Invalid username", description: userErr, variant: "destructive" }); return; }
+    }
+
     setLoading(true);
 
     try {
