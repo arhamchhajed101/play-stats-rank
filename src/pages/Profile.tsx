@@ -183,7 +183,7 @@ const Profile = () => {
           className="mb-8"
         >
           <GamerScoreCard
-            stats={{ kills: totalKills, deaths: totalDeaths, wins: totalWins, losses: totalLosses, hoursPlayed: totalHours }}
+            stats={{ kills: totalKills, deaths: totalDeaths, wins: totalWins, losses: totalLosses, hoursPlayed: totalHours, gamesTracked: trackedGames.length || 2 }}
           />
         </motion.div>
 

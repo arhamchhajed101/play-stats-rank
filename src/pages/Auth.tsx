@@ -7,15 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { emailSchema, passwordSchema, usernameSchema, getValidationError } from "@/lib/validation";
-import { Gamepad2, Eye, EyeOff, Sparkles, UserCheck, ShieldCheck } from "lucide-react";
+import { Gamepad2, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 
-const DEMO_USER_ID = "demo-gamer-user-id";
-const DEMO_PROFILE = {
-  id: DEMO_USER_ID,
-  username: "ShadowStrike",
-  total_points: 2450,
-  created_at: new Date().toISOString(),
+const AUTH_ERRORS: Record<string, string> = {
+  "Invalid login credentials": "Incorrect email or password. Please try again.",
+  "Email not confirmed": "Please check your email and click the confirmation link before signing in.",
+  "User already registered": "An account with this email already exists. Try signing in instead.",
+  "Password should be at least": "Password must be at least 8 characters.",
+  "signup_disabled": "New sign-ups are temporarily disabled. Please try again later.",
+  "over_email_send_rate_limit": "Too many attempts. Please wait a few minutes before trying again.",
+  "email_address_not_authorized": "This email is not authorized. Contact support.",
+  "Failed to fetch": "Cannot connect to server. Please check your connection and try again.",
+  "NetworkError": "Network error. Please check your internet connection.",
 };
+
+function friendlyError(msg: string): string {
+  for (const [key, friendly] of Object.entries(AUTH_ERRORS)) {
+    if (msg.toLowerCase().includes(key.toLowerCase())) return friendly;
+  }
+  return msg || "Something went wrong. Please try again.";
+}
 
 const Auth = () => {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
@@ -24,73 +35,43 @@ const Auth = () => {
   const [username, setUsername] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate("/dashboard");
-      }
+      if (session) navigate("/dashboard");
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        navigate("/dashboard");
-      }
+      if (session) navigate("/dashboard");
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Ensure user profile exists in database
-  const ensureUserProfile = async (userId: string, userEmail: string, chosenUsername?: string) => {
-    try {
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (!existingProfile) {
-        const finalUsername = chosenUsername || userEmail.split("@")[0] || "Gamer";
-        await supabase.from("profiles").upsert({
-          id: userId,
-          username: finalUsername,
-          total_points: 1000,
-          created_at: new Date().toISOString(),
-        });
-      }
-    } catch {
-      // Ignore background profile sync error
-    }
-  };
+  // Clear error when switching modes
+  useEffect(() => {
+    setErrorMsg("");
+  }, [mode]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg("");
 
     // Client-side validation
     const emailErr = getValidationError(emailSchema, email);
-    if (emailErr) {
-      toast({ title: "Invalid email", description: emailErr, variant: "destructive" });
-      return;
-    }
+    if (emailErr) { setErrorMsg(emailErr); return; }
 
     if (mode !== "forgot") {
       const passErr = getValidationError(passwordSchema, password);
-      if (passErr) {
-        toast({ title: "Invalid password", description: passErr, variant: "destructive" });
-        return;
-      }
+      if (passErr) { setErrorMsg(passErr); return; }
     }
 
-    if (mode === "signup" && username) {
+    if (mode === "signup") {
       const userErr = getValidationError(usernameSchema, username);
-      if (userErr) {
-        toast({ title: "Invalid username", description: userErr, variant: "destructive" });
-        return;
-      }
+      if (userErr) { setErrorMsg(userErr); return; }
     }
 
     setLoading(true);
@@ -102,172 +83,106 @@ const Auth = () => {
         });
         if (error) throw error;
         toast({
-          title: "Check your email",
-          description: "We sent you a password reset link.",
+          title: "Reset link sent!",
+          description: "Check your email for a password reset link.",
         });
         setMode("login");
         return;
       }
 
       if (mode === "login") {
-        // Direct standard Supabase Auth Login
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
-          password: password,
+          password,
         });
 
-        if (error) {
-          // If login fails, provide clear advice
-          throw error;
-        }
+        if (error) throw error;
+        if (!data.session) throw new Error("Login failed — no session returned. Please try again.");
 
-        if (data?.user) {
-          await ensureUserProfile(data.user.id, data.user.email || email);
-          toast({
-            title: "Welcome back!",
-            description: "Successfully signed in to Gamers Tag.",
-          });
-          navigate("/dashboard");
-        }
+        toast({
+          title: "Welcome back! 🎮",
+          description: "Successfully signed in.",
+        });
+        navigate("/dashboard");
+
       } else {
-        // Direct standard Supabase Auth SignUp
+        // Signup — use direct Supabase client (no edge function)
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
-          password: password,
+          password,
           options: {
-            data: {
-              username: username.trim(),
-            },
+            data: { username: username.trim() },
+            emailRedirectTo: `${window.location.origin}/dashboard`,
           },
         });
 
         if (error) throw error;
 
-        if (data?.user) {
-          await ensureUserProfile(data.user.id, data.user.email || email, username.trim());
-          
-          if (data.session) {
-            toast({
-              title: "Account created!",
-              description: "Welcome to Gamers Tag! Setting up your gaming identity...",
-            });
-            navigate("/dashboard");
-          } else {
-            toast({
-              title: "Account registered!",
-              description: "Check your email to verify your account or sign in directly.",
-            });
-            setMode("login");
-          }
+        // If email confirmation is disabled, session is returned immediately
+        if (data.session) {
+          toast({
+            title: "Account created! 🎉",
+            description: "Welcome to Gamers Tag!",
+          });
+          navigate("/dashboard");
+        } else {
+          // Email confirmation required
+          toast({
+            title: "Almost there!",
+            description: "We sent you a confirmation email. Click the link to activate your account, then sign in.",
+          });
+          setMode("login");
         }
       }
     } catch (error: any) {
-      toast({
-        title: "Authentication Failed",
-        description: error.message || "Could not sign in. Please verify your credentials.",
-        variant: "destructive",
-      });
+      const msg = friendlyError(error.message || "");
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Instant Demo Gamer Login (One-click access)
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    try {
-      // First attempt test demo credentials if configured, or authenticate with test account
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: "demo@gamerstag.gg",
-        password: "Password123!",
-      });
-
-      if (!error && data?.session) {
-        toast({
-          title: "Demo Mode Activated!",
-          description: "Logged in as Pro Gamer ShadowStrike.",
-        });
-        navigate("/dashboard");
-        return;
-      }
-
-      // If test account not yet created, create it automatically
-      const signUpRes = await supabase.auth.signUp({
-        email: "demo@gamerstag.gg",
-        password: "Password123!",
-        options: { data: { username: "ShadowStrike" } },
-      });
-
-      if (signUpRes.data?.user) {
-        await ensureUserProfile(signUpRes.data.user.id, "demo@gamerstag.gg", "ShadowStrike");
-        if (signUpRes.data.session) {
-          toast({
-            title: "Welcome, ShadowStrike!",
-            description: "Pro demo profile ready.",
-          });
-          navigate("/dashboard");
-          return;
-        }
-      }
-
-      // Fallback guest session
-      localStorage.setItem("gamers_tag_demo_user", JSON.stringify(DEMO_PROFILE));
-      toast({
-        title: "Guest Explorer Mode",
-        description: "Exploring Gamers Tag with full dashboard features.",
-      });
-      navigate("/dashboard");
-    } catch {
-      localStorage.setItem("gamers_tag_demo_user", JSON.stringify(DEMO_PROFILE));
-      navigate("/dashboard");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const modeTitle = mode === "login" ? "Welcome Back" : mode === "signup" ? "Join Gamers Tag" : "Reset Password";
+  const modeDesc =
+    mode === "login"
+      ? "Sign in to track your gaming stats"
+      : mode === "signup"
+      ? "Create an account to start tracking"
+      : "Enter your email to receive a reset link";
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background relative overflow-hidden">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-secondary/10 rounded-full blur-3xl pointer-events-none" />
-
-      <Card className="w-full max-w-md border-border/50 bg-card/60 backdrop-blur-xl shadow-2xl relative z-10">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex items-center justify-center mb-3">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center shadow-lg">
-              <Gamepad2 className="h-8 w-8 text-primary" style={{ filter: "drop-shadow(var(--shadow-glow))" }} />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <Card className="w-full max-w-md border-border/50 bg-card/50 backdrop-blur-sm shadow-xl">
+        <CardHeader className="space-y-1">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center shadow-lg">
+              <Gamepad2 className="h-9 w-9 text-primary" style={{ filter: "drop-shadow(var(--shadow-glow))" }} />
             </div>
           </div>
-          <CardTitle className="text-2xl font-extrabold tracking-tight">
-            {mode === "login" ? "Welcome Back, Gamer" : mode === "signup" ? "Join Gamers Tag" : "Reset Password"}
-          </CardTitle>
-          <CardDescription>
-            {mode === "login"
-              ? "Sign in to track your gaming stats & climb the ranks"
-              : mode === "signup"
-              ? "Create your unified gaming identity in seconds"
-              : "Enter your email to receive a secure reset link"}
-          </CardDescription>
+          <CardTitle className="text-2xl text-center font-extrabold">{modeTitle}</CardTitle>
+          <CardDescription className="text-center">{modeDesc}</CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          <form onSubmit={handleAuth} className="space-y-3.5">
+        <CardContent>
+          <form onSubmit={handleAuth} className="space-y-4" noValidate>
             {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="username">Username / Gamertag</Label>
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
                   placeholder="ProGamer123"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
-                  className="bg-background/50 border-border/60"
+                  autoComplete="username"
+                  disabled={loading}
                 />
+                <p className="text-xs text-muted-foreground">2–30 characters. Letters, numbers, hyphens, underscores only.</p>
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email Address</Label>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -275,24 +190,14 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-background/50 border-border/60"
+                autoComplete="email"
+                disabled={loading}
               />
             </div>
 
             {mode !== "forgot" && (
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password">Password</Label>
-                  {mode === "login" && (
-                    <button
-                      type="button"
-                      onClick={() => setMode("forgot")}
-                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      Forgot password?
-                    </button>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -301,74 +206,87 @@ const Auth = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="bg-background/50 border-border/60 pr-10"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                    disabled={loading}
+                    className="pr-10"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                {mode === "signup" && (
+                  <p className="text-xs text-muted-foreground">Minimum 8 characters.</p>
+                )}
               </div>
             )}
 
-            <Button type="submit" className="w-full font-bold shadow-lg" disabled={loading}>
-              {loading
-                ? "Connecting..."
-                : mode === "login"
-                ? "Sign In"
-                : mode === "signup"
-                ? "Create Account"
-                : "Send Reset Link"}
+            {mode === "login" && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setMode("forgot")}
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            {/* Inline error message */}
+            {errorMsg && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full font-bold" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {mode === "login" ? "Signing in..." : mode === "signup" ? "Creating account..." : "Sending..."}
+                </>
+              ) : mode === "login" ? (
+                "Sign In"
+              ) : mode === "signup" ? (
+                "Create Account"
+              ) : (
+                "Send Reset Link"
+              )}
             </Button>
           </form>
 
-          {/* Quick Demo Login Option */}
-          <div className="relative pt-2">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border/50" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground font-semibold">Or Instant Access</span>
-            </div>
+          <div className="mt-4 text-center text-sm">
+            {mode !== "forgot" ? (
+              <button
+                type="button"
+                onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                className="text-primary hover:underline font-medium"
+              >
+                {mode === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="text-primary hover:underline font-medium"
+              >
+                ← Back to sign in
+              </button>
+            )}
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleDemoLogin}
-            disabled={loading}
-            className="w-full border-primary/30 hover:bg-primary/10 hover:border-primary/50 text-foreground transition-all flex items-center justify-center gap-2 shadow-sm"
-          >
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span>One-Click Pro Gamer Demo</span>
-          </Button>
-
-          <div className="text-center text-sm pt-2">
-            <button
-              type="button"
-              onClick={() => setMode(mode === "login" ? "signup" : "login")}
-              className="text-primary hover:underline font-medium"
-            >
-              {mode === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-            </button>
-          </div>
-
-          {/* Security badge */}
-          <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              Secure Auth
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <UserCheck className="h-3.5 w-3.5 text-blue-400" />
-              Instant Session Sync
-            </span>
-          </div>
+          {mode === "signup" && (
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              By signing up you agree to our Terms of Service and Privacy Policy.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

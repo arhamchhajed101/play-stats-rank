@@ -606,6 +606,7 @@ const Dashboard = () => {
                     wins: totalWins,
                     losses: stats.reduce((s, st) => s + (st.losses || 0), 0),
                     hoursPlayed: totalHours,
+                    gamesTracked: gameStatsArray.length,
                   }}
                 />
               </div>
