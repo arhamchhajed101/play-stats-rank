@@ -2,24 +2,19 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Read the common env var names this project has used historically.
-// Preferred: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-// Backwards-compatible fallbacks: VITE_SUPABASE_PUBLISHABLE_KEY
+// Preferred env names used by Vite + this project
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+// Prefer the anon/public key name, but fall back to older "publishable" name
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Helpful runtime check to surface misconfiguration early instead of mysterious auth failures.
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  const missing = [];
+  const missing: string[] = [];
   if (!SUPABASE_URL) missing.push('VITE_SUPABASE_URL');
   if (!SUPABASE_ANON_KEY) missing.push('VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY)');
   // eslint-disable-next-line no-console
   console.error('[supabase] Missing env vars:', missing.join(', '));
   throw new Error(`[supabase] Missing required environment variables: ${missing.join(', ')}. See README for setup instructions.`);
 }
-
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
