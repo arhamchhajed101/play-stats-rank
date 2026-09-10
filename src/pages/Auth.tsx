@@ -91,19 +91,82 @@ const Auth = () => {
       }
 
       if (mode === "login") {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
+        // First try the built-in Supabase client sign-in which is the recommended path
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
 
-        if (error) throw error;
-        if (!data.session) throw new Error("Login failed — no session returned. Please try again.");
+          if (!error && data?.session) {
+            toast({ title: "Welcome back! 🎮", description: "Successfully signed in." });
+            navigate("/dashboard");
+            return;
+          }
 
-        toast({
-          title: "Welcome back! 🎮",
-          description: "Successfully signed in.",
-        });
-        navigate("/dashboard");
+          // If there was an error or no session returned, fall through to edge-function fallback
+          // preserve the original error for later if fallback also fails
+          var originalSignInError = error ? error : new Error("Login failed — no session returned. Trying edge fallback.");
+        } catch (signErr) {
+          // capture error and try edge function fallback
+          var originalSignInError = signErr as any;
+        }
+
+        // Edge-function fallback: call the auth-password function on Supabase
+        try {
+          const EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-password`;
+          const EDGE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+          if (!EDGE_URL || !EDGE_ANON) {
+            throw new Error("Missing EDGE function env vars: VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY");
+          }
+
+          const resp = await fetch(EDGE_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "apikey": EDGE_ANON,
+            },
+            body: JSON.stringify({ action: "login", email: email.trim(), password }),
+          });
+
+          const body = await resp.json().catch(() => ({}));
+
+          if (!resp.ok) {
+            throw new Error(body?.error || body?.message || `Edge function returned status ${resp.status}`);
+          }
+
+          // The edge function should return the Supabase token response under data
+          const tokenData = body?.data;
+
+          if (tokenData?.access_token) {
+            // Set session in supabase client so subsequent requests work
+            await supabase.auth.setSession({ access_token: tokenData.access_token, refresh_token: tokenData.refresh_token });
+            toast({ title: "Welcome back! 🎮", description: "Successfully signed in (edge)." });
+            navigate("/dashboard");
+            return;
+          }
+
+          // Some edge functions return the full response directly
+          if (tokenData?.session) {
+            // If session object returned, try to set it
+            const access = tokenData.session.access_token ?? tokenData.session.access_token;
+            const refresh = tokenData.session.refresh_token ?? tokenData.session.refresh_token;
+            if (access) {
+              await supabase.auth.setSession({ access_token: access, refresh_token: refresh });
+              toast({ title: "Welcome back! 🎮", description: "Successfully signed in (edge)." });
+              navigate("/dashboard");
+              return;
+            }
+          }
+
+          // If we reach here, fallback did not return tokens — throw to outer catch
+          throw new Error(body?.error || "Login failed via edge function. No tokens returned.");
+        } catch (edgeErr: any) {
+          // If edge also fails, prefer the edge error message but keep original available
+          const finalErr = edgeErr?.message || originalSignInError?.message || "Login failed";
+          throw new Error(finalErr);
+        }
 
       } else {
         // Signup — use direct Supabase client (no edge function)
