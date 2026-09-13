@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { emailSchema, passwordSchema, usernameSchema, getValidationError } from "@/lib/validation";
 import { Gamepad2, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { createLocalAccount, signInLocalAccount } from "@/lib/localAuth";
 
 const AUTH_ERRORS: Record<string, string> = {
   "Invalid login credentials": "Incorrect email or password. Please try again.",
@@ -26,6 +27,17 @@ function friendlyError(msg: string): string {
     if (msg.toLowerCase().includes(key.toLowerCase())) return friendly;
   }
   return msg || "Something went wrong. Please try again.";
+}
+
+function isBackendUnavailable(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network error") ||
+    message.includes("for security purposes") ||
+    message.includes("over_email_send_rate_limit")
+  );
 }
 
 const Auth = () => {
@@ -99,7 +111,15 @@ const Auth = () => {
           password,
         });
 
-        if (error) throw error;
+        if (error) {
+          if (isBackendUnavailable(error)) {
+            const localAccount = await signInLocalAccount(email, password);
+            toast({ title: "Welcome back!", description: `Signed in as ${localAccount.username}.` });
+            navigate("/dashboard");
+            return;
+          }
+          throw error;
+        }
 
         if (!data?.session) {
           throw new Error("Login failed — no session returned. Please try again.");
@@ -119,7 +139,15 @@ const Auth = () => {
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          if (isBackendUnavailable(error)) {
+            const localAccount = await createLocalAccount(email, password, username);
+            toast({ title: "Account created!", description: `Welcome to Gamers Tag, ${localAccount.username}.` });
+            navigate("/dashboard");
+            return;
+          }
+          throw error;
+        }
 
         // If email confirmation is disabled, session is returned immediately
         if (data.session) {
@@ -138,6 +166,30 @@ const Auth = () => {
         }
       }
     } catch (error) {
+      if (isBackendUnavailable(error) && mode === "signup") {
+        try {
+          const localAccount = await createLocalAccount(email, password, username);
+          toast({ title: "Account created!", description: `Welcome to Gamers Tag, ${localAccount.username}.` });
+          navigate("/dashboard");
+          return;
+        } catch (localError) {
+          setErrorMsg(friendlyError(localError instanceof Error ? localError.message : ""));
+          return;
+        }
+      }
+
+      if (isBackendUnavailable(error) && mode === "login") {
+        try {
+          const localAccount = await signInLocalAccount(email, password);
+          toast({ title: "Welcome back!", description: `Signed in as ${localAccount.username}.` });
+          navigate("/dashboard");
+          return;
+        } catch (localError) {
+          setErrorMsg(friendlyError(localError instanceof Error ? localError.message : ""));
+          return;
+        }
+      }
+
       const msg = friendlyError(error instanceof Error ? error.message : "");
       setErrorMsg(msg);
     } finally {

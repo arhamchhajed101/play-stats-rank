@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Gamepad2, Home, Trophy, LogOut, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { clearLocalSession } from "@/lib/localAuth";
 
 const Navigation = () => {
   const location = useLocation();
@@ -10,6 +11,7 @@ const Navigation = () => {
   const { toast } = useToast();
 
   const handleLogout = async () => {
+    clearLocalSession();
     localStorage.removeItem("gamers_tag_demo_user");
     try {
       await supabase.auth.signOut();

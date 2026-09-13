@@ -42,7 +42,7 @@ const Leaderboard = () => {
         .limit(50);
       if (data && data.length > 0) {
         // Merge Supabase profiles with default leaderboard for top rankings
-        const merged = [...data];
+        const merged: any[] = [...data];
         DEFAULT_LEADERBOARD.forEach((dl) => {
           if (!merged.some((m) => m.username.toLowerCase() === dl.username.toLowerCase())) {
             merged.push(dl);
