@@ -31,7 +31,13 @@ function friendlyError(msg: string): string {
 
 function isBackendUnavailable(error: unknown): boolean {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return message.includes("failed to fetch") || message.includes("networkerror") || message.includes("network error");
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network error") ||
+    message.includes("for security purposes") ||
+    message.includes("over_email_send_rate_limit")
+  );
 }
 
 const Auth = () => {
