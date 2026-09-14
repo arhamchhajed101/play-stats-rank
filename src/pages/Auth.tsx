@@ -40,6 +40,20 @@ function isBackendUnavailable(error: unknown): boolean {
   );
 }
 
+function isLocalAuthFallbackError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("failed to fetch") || message.includes("networkerror") || message.includes("network error");
+}
+
+async function invokeAuthFunction(body: Record<string, string>) {
+  const response = await supabase.functions.invoke("auth-password", { body });
+  if (response.error) throw response.error;
+
+  const payload = response.data as { data?: { access_token?: string; refresh_token?: string; user?: unknown }; error?: string } | null;
+  if (!payload?.data) throw new Error(payload?.error || "Authentication service returned an invalid response.");
+  return payload.data;
+}
+
 const Auth = () => {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
@@ -103,54 +117,52 @@ const Auth = () => {
       }
 
       if (mode === "login") {
-        // Sign in directly against Supabase Auth. This is the standard,
-        // supported path — it uses the anon key and needs no custom edge
-        // function, so there's no extra deployment/config that can break it.
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-
-        if (error) {
-          if (isBackendUnavailable(error)) {
-            const localAccount = await signInLocalAccount(email, password);
-            toast({ title: "Welcome back!", description: `Signed in as ${localAccount.username}.` });
-            navigate("/dashboard");
-            return;
+        try {
+          const authData = await invokeAuthFunction({ action: "login", email: email.trim(), password });
+          if (!authData.access_token || !authData.refresh_token) {
+            throw new Error("Login failed — no session returned. Please try again.");
           }
-          throw error;
-        }
-
-        if (!data?.session) {
-          throw new Error("Login failed — no session returned. Please try again.");
+          const { error } = await supabase.auth.setSession({
+            access_token: authData.access_token,
+            refresh_token: authData.refresh_token,
+          });
+          if (error) throw error;
+        } catch (error) {
+          if (!isLocalAuthFallbackError(error)) throw error;
+          const localAccount = await signInLocalAccount(email, password);
+          toast({ title: "Welcome back!", description: `Signed in as ${localAccount.username}.` });
+          navigate("/dashboard");
+          return;
         }
 
         toast({ title: "Welcome back! 🎮", description: "Successfully signed in." });
         navigate("/dashboard");
         return;
       } else {
-        // Signup — use direct Supabase client (no edge function)
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: { username: username.trim() },
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-          },
-        });
-
-        if (error) {
-          if (isBackendUnavailable(error)) {
-            const localAccount = await createLocalAccount(email, password, username);
-            toast({ title: "Account created!", description: `Welcome to Gamers Tag, ${localAccount.username}.` });
-            navigate("/dashboard");
-            return;
-          }
-          throw error;
+        let authData: { access_token?: string; refresh_token?: string; user?: unknown };
+        try {
+          authData = await invokeAuthFunction({
+            action: "signup",
+            email: email.trim(),
+            password,
+            username: username.trim(),
+            redirectTo: `${window.location.origin}/auth`,
+          });
+        } catch (error) {
+          if (!isLocalAuthFallbackError(error)) throw error;
+          const localAccount = await createLocalAccount(email, password, username);
+          toast({ title: "Account created!", description: `Welcome to Gamers Tag, ${localAccount.username}.` });
+          navigate("/dashboard");
+          return;
         }
 
         // If email confirmation is disabled, session is returned immediately
-        if (data.session) {
+        if (authData.access_token && authData.refresh_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token: authData.access_token,
+            refresh_token: authData.refresh_token,
+          });
+          if (error) throw error;
           toast({
             title: "Account created! 🎉",
             description: "Welcome to Gamers Tag!",
@@ -166,7 +178,7 @@ const Auth = () => {
         }
       }
     } catch (error) {
-      if (isBackendUnavailable(error) && mode === "signup") {
+      if (isLocalAuthFallbackError(error) && mode === "signup") {
         try {
           const localAccount = await createLocalAccount(email, password, username);
           toast({ title: "Account created!", description: `Welcome to Gamers Tag, ${localAccount.username}.` });
@@ -178,7 +190,7 @@ const Auth = () => {
         }
       }
 
-      if (isBackendUnavailable(error) && mode === "login") {
+      if (isLocalAuthFallbackError(error) && mode === "login") {
         try {
           const localAccount = await signInLocalAccount(email, password);
           toast({ title: "Welcome back!", description: `Signed in as ${localAccount.username}.` });

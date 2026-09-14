@@ -1,4 +1,4 @@
-const LOCAL_ACCOUNT_KEY = "gamers_tag_local_account";
+const LOCAL_ACCOUNT_KEY = "gamers_tag_local_accounts";
 const LOCAL_SESSION_KEY = "gamers_tag_demo_user";
 
 export interface LocalAccount {
@@ -15,13 +15,24 @@ async function hashPassword(password: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function readAccount(): LocalAccount | null {
+function readAccounts(): LocalAccount[] {
   try {
     const stored = localStorage.getItem(LOCAL_ACCOUNT_KEY);
-    return stored ? (JSON.parse(stored) as LocalAccount) : null;
+    if (!stored) return [];
+
+    const parsed: unknown = JSON.parse(stored);
+    if (Array.isArray(parsed)) return parsed as LocalAccount[];
+
+    // Migrate the previous single-account fallback without losing it.
+    if (parsed && typeof parsed === "object") return [parsed as LocalAccount];
+    return [];
   } catch {
-    return null;
+    return [];
   }
+}
+
+function saveAccounts(accounts: LocalAccount[]) {
+  localStorage.setItem(LOCAL_ACCOUNT_KEY, JSON.stringify(accounts));
 }
 
 function saveSession(account: LocalAccount) {
@@ -33,8 +44,8 @@ function saveSession(account: LocalAccount) {
 
 export async function createLocalAccount(email: string, password: string, username: string): Promise<LocalAccount> {
   const normalizedEmail = email.trim().toLowerCase();
-  const existing = readAccount();
-  if (existing?.email === normalizedEmail) {
+  const accounts = readAccounts();
+  if (accounts.some((account) => account.email === normalizedEmail)) {
     throw new Error("An account with this email already exists. Try signing in instead.");
   }
 
@@ -46,13 +57,13 @@ export async function createLocalAccount(email: string, password: string, userna
     createdAt: new Date().toISOString(),
   };
 
-  localStorage.setItem(LOCAL_ACCOUNT_KEY, JSON.stringify(account));
+  saveAccounts([...accounts, account]);
   saveSession(account);
   return account;
 }
 
 export async function signInLocalAccount(email: string, password: string): Promise<LocalAccount> {
-  const account = readAccount();
+  const account = readAccounts().find((candidate) => candidate.email === email.trim().toLowerCase());
   if (!account || account.email !== email.trim().toLowerCase() || account.passwordHash !== await hashPassword(password)) {
     throw new Error("Incorrect email or password. Please try again.");
   }
@@ -66,5 +77,5 @@ export function clearLocalSession() {
 }
 
 export function hasLocalAccount() {
-  return Boolean(readAccount());
+  return readAccounts().length > 0;
 }

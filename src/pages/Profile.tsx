@@ -17,15 +17,7 @@ const skillData = [
 ];
 
 function computeSkills(stats: any[]) {
-  if (!stats.length) {
-    return [
-      { ...skillData[0], value: 84 },
-      { ...skillData[1], value: 88 },
-      { ...skillData[2], value: 76 },
-      { ...skillData[3], value: 92 },
-      { ...skillData[4], value: 78 },
-    ];
-  }
+  if (!stats.length) return skillData.map((skill) => ({ ...skill, value: 0 }));
   const totalKills = stats.reduce((s, st) => s + (st.kills || 0), 0);
   const totalDeaths = stats.reduce((s, st) => s + (st.deaths || 0), 0);
   const totalWins = stats.reduce((s, st) => s + (st.wins || 0), 0);
@@ -116,11 +108,11 @@ const Profile = () => {
 
   const skills = computeSkills(stats);
   const gamerType = getGamerType(skills);
-  const totalHours = stats.length > 0 ? stats.reduce((s, st) => s + parseFloat(st.hours_played || 0), 0) : 43.7;
-  const totalKills = stats.length > 0 ? stats.reduce((s, st) => s + (st.kills || 0), 0) : 363;
-  const totalDeaths = stats.length > 0 ? stats.reduce((s, st) => s + (st.deaths || 0), 0) : 250;
-  const totalWins = stats.length > 0 ? stats.reduce((s, st) => s + (st.wins || 0), 0) : 33;
-  const totalLosses = stats.length > 0 ? stats.reduce((s, st) => s + (st.losses || 0), 0) : 19;
+  const totalHours = stats.reduce((s, st) => s + parseFloat(st.hours_played || 0), 0);
+  const totalKills = stats.reduce((s, st) => s + (st.kills || 0), 0);
+  const totalDeaths = stats.reduce((s, st) => s + (st.deaths || 0), 0);
+  const totalWins = stats.reduce((s, st) => s + (st.wins || 0), 0);
+  const totalLosses = stats.reduce((s, st) => s + (st.losses || 0), 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -158,7 +150,7 @@ const Profile = () => {
 
                 <div className="grid grid-cols-3 gap-6 text-center">
                   <div className="bg-card/50 p-3 rounded-xl border border-border/40">
-                    <div className="text-2xl font-extrabold text-primary font-mono">{profile?.total_points || 2450}</div>
+                     <div className="text-2xl font-extrabold text-primary font-mono">{profile?.total_points || 0}</div>
                     <div className="text-xs text-muted-foreground font-semibold">Points</div>
                   </div>
                   <div className="bg-card/50 p-3 rounded-xl border border-border/40">
@@ -279,10 +271,10 @@ const Profile = () => {
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           {[
-            { icon: Trophy, label: "Total Points", value: profile?.total_points || 2450, color: "text-primary" },
+             { icon: Trophy, label: "Total Points", value: profile?.total_points || 0, color: "text-primary" },
             { icon: Clock, label: "Hours Played", value: `${totalHours.toFixed(1)}h`, color: "text-secondary" },
             { icon: Target, label: "Total Kills", value: totalKills, color: "text-accent" },
-            { icon: BarChart3, label: "Games Tracked", value: trackedGames.length || 2, color: "text-emerald-400" },
+             { icon: BarChart3, label: "Games Tracked", value: trackedGames.length, color: "text-emerald-400" },
           ].map((stat) => (
             <Card key={stat.label} className="border-border/30 bg-card/50 backdrop-blur-sm shadow-md">
               <CardContent className="p-4 flex items-center gap-3">
