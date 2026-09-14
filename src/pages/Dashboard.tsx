@@ -86,49 +86,6 @@ const DEFAULT_GAMES_CATALOG = [
   },
 ];
 
-// Initial seeded stats for exciting first dashboard experience
-const INITIAL_DEMO_STATS = [
-  {
-    id: "stat-1",
-    user_id: "demo-user",
-    game_id: "game-valorant",
-    kills: 148,
-    deaths: 92,
-    wins: 14,
-    losses: 6,
-    hours_played: 18.5,
-    points_earned: 850,
-    date: new Date().toISOString(),
-    games: { name: "Valorant" },
-  },
-  {
-    id: "stat-2",
-    user_id: "demo-user",
-    game_id: "game-cs2",
-    kills: 120,
-    deaths: 88,
-    wins: 11,
-    losses: 7,
-    hours_played: 14.0,
-    points_earned: 620,
-    date: new Date().toISOString(),
-    games: { name: "Counter-Strike 2" },
-  },
-  {
-    id: "stat-3",
-    user_id: "demo-user",
-    game_id: "game-apex",
-    kills: 95,
-    deaths: 70,
-    wins: 8,
-    losses: 12,
-    hours_played: 11.2,
-    points_earned: 480,
-    date: new Date().toISOString(),
-    games: { name: "Apex Legends" },
-  },
-];
-
 const Dashboard = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -214,25 +171,7 @@ const Dashboard = () => {
       }
     }
 
-    // Default tracked games for demo/new account
-    const initialTracked = [
-      {
-        id: "tg-1",
-        user_id: userId,
-        game_id: "game-valorant",
-        ingame_id: "ShadowStrike#NA1",
-        games: DEFAULT_GAMES_CATALOG[0],
-      },
-      {
-        id: "tg-2",
-        user_id: userId,
-        game_id: "game-cs2",
-        ingame_id: "ShadowStrike_CS",
-        games: DEFAULT_GAMES_CATALOG[1],
-      },
-    ];
-    setTrackedGames(initialTracked);
-    localStorage.setItem(`tracked_games_${userId}`, JSON.stringify(initialTracked));
+    setTrackedGames([]);
   }, []);
 
   const fetchStats = useCallback(async (userId: string) => {
@@ -261,8 +200,7 @@ const Dashboard = () => {
       }
     }
 
-    setStats(INITIAL_DEMO_STATS);
-    localStorage.setItem(`user_stats_${userId}`, JSON.stringify(INITIAL_DEMO_STATS));
+    setStats([]);
   }, []);
 
   useEffect(() => {
@@ -274,7 +212,7 @@ const Dashboard = () => {
         const demoUser = localStorage.getItem("gamers_tag_demo_user");
         if (demoUser && isMounted) {
           const parsed = JSON.parse(demoUser);
-          setUser({ id: parsed.id, email: "demo@gamerstag.gg" });
+           setUser({ id: parsed.id, email: parsed.email });
           fetchProfile(parsed.id);
           fetchGames();
           fetchTrackedGames(parsed.id);
@@ -397,7 +335,10 @@ const Dashboard = () => {
 
     const updated = trackedGames.filter((tg) => tg.game_id !== gameId);
     setTrackedGames(updated);
+    const updatedStats = stats.filter((stat) => stat.game_id !== gameId);
+    setStats(updatedStats);
     localStorage.setItem(`tracked_games_${user.id}`, JSON.stringify(updated));
+    localStorage.setItem(`user_stats_${user.id}`, JSON.stringify(updatedStats));
     toast({ title: "Game removed", description: "No longer tracking this game." });
   };
 
@@ -461,8 +402,10 @@ const Dashboard = () => {
   };
 
   // Build per-game aggregated stats
+  const activeGameIds = new Set(trackedGames.map((tg) => tg.game_id));
+  const activeStats = stats.filter((s) => activeGameIds.has(s.game_id));
   const gameStatsMap = new Map<string, { kills: number; deaths: number; wins: number; losses: number; hoursPlayed: number; points: number }>();
-  for (const s of stats) {
+  for (const s of activeStats) {
     const name = (s as any).games?.name || "Unknown";
     const existing = gameStatsMap.get(name) || { kills: 0, deaths: 0, wins: 0, losses: 0, hoursPlayed: 0, points: 0 };
     existing.kills += s.kills || 0;
@@ -475,9 +418,9 @@ const Dashboard = () => {
   }
   const gameStatsArray = Array.from(gameStatsMap.entries()).map(([gameName, data]) => ({ gameName, ...data }));
 
-  const totalHours = stats.reduce((sum, stat) => sum + parseFloat(stat.hours_played || 0), 0);
-  const totalKills = stats.reduce((sum, stat) => sum + (stat.kills || 0), 0);
-  const totalWins = stats.reduce((sum, stat) => sum + (stat.wins || 0), 0);
+  const totalHours = activeStats.reduce((sum, stat) => sum + parseFloat(stat.hours_played || 0), 0);
+  const totalKills = activeStats.reduce((sum, stat) => sum + (stat.kills || 0), 0);
+  const totalWins = activeStats.reduce((sum, stat) => sum + (stat.wins || 0), 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -519,7 +462,7 @@ const Dashboard = () => {
               <Trophy className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-extrabold text-primary font-mono">{profile?.total_points || 2450}</div>
+              <div className="text-3xl font-extrabold text-primary font-mono">{profile?.total_points || 0}</div>
               <p className="text-xs text-muted-foreground mt-1">Global ranking score</p>
             </CardContent>
           </Card>
