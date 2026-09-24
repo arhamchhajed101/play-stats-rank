@@ -49,11 +49,13 @@ const TrackGameDialog = ({ open, onClose, gameName, onConfirm }: TrackGameDialog
         <DialogHeader>
           <DialogTitle>Track {gameName}</DialogTitle>
           <DialogDescription>
-            Enter your in-game ID so we can automatically fetch your stats.
+            {gameName === "Counter-Strike 2"
+              ? "Enter your 17-digit SteamID64 or custom profile name. Your Steam profile and game details must be public to sync playtime."
+              : "Enter your in-game ID so we can automatically fetch your stats."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="ingame-id">In-Game ID</Label>
+          <Label htmlFor="ingame-id">{gameName === "Counter-Strike 2" ? "Steam profile ID" : "In-Game ID"}</Label>
           <Input
             id="ingame-id"
             placeholder={placeholders[gameName] || "Your in-game username or ID"}

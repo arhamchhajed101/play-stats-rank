@@ -32,6 +32,7 @@ import TrackGameDialog from "@/components/TrackGameDialog";
 import CombinedStatsCard from "@/components/CombinedStatsCard";
 import ValorantTracker from "@/components/ValorantTracker";
 import GamerScoreCard from "@/components/GamerScoreCard";
+import { steamIdSchema } from "@/lib/validation";
 
 // Standard Popular Games catalog with rich metadata
 const DEFAULT_GAMES_CATALOG = [
@@ -269,11 +270,44 @@ const Dashboard = () => {
     setTrackedGames(updated);
     localStorage.setItem(`tracked_games_${user.id}`, JSON.stringify(updated));
 
+    if (game?.name === "Counter-Strike 2" || game?.name === "CS2") {
+      await syncCs2Stats(ingameId);
+      return;
+    }
+
     toast({ title: "Game connected!", description: `Tracking stats for ${game?.name || "game"}.` });
 
     if (game?.name === "Valorant" && ingameId.includes("#")) {
       await fetchValorantStats(ingameId);
     }
+  };
+
+  const syncCs2Stats = async (steamId: string) => {
+    const validatedId = steamIdSchema.safeParse(steamId);
+    if (!validatedId.success) {
+      toast({ title: "Check the Steam ID", description: validatedId.error.issues[0]?.message, variant: "destructive" });
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke("fetch-cs2-stats", {
+      body: { steam_id: validatedId.data },
+    });
+
+    if (error || data?.error) {
+      const detail = data?.error || error?.message || "Steam could not return stats.";
+      toast({
+        title: "Counter-Strike stats not synced",
+        description: detail,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (user) await fetchStats(user.id);
+    toast({
+      title: "Counter-Strike synced",
+      description: `${data.playerName || "Steam profile"} • ${Number(data.hoursPlayed || 0).toFixed(1)} hours on record`,
+    });
   };
 
   const fetchValorantStats = async (ingameId: string) => {
@@ -349,6 +383,9 @@ const Dashboard = () => {
       if (tg.games?.name === "Valorant" && tg.ingame_id?.includes("#")) {
         await fetchValorantStats(tg.ingame_id);
       }
+      if ((tg.games?.name === "Counter-Strike 2" || tg.games?.name === "CS2") && tg.ingame_id) {
+        await syncCs2Stats(tg.ingame_id);
+      }
     }
     await fetchStats(user.id);
     setSyncing(false);
@@ -412,7 +449,10 @@ const Dashboard = () => {
     existing.deaths += s.deaths || 0;
     existing.wins += s.wins || 0;
     existing.losses += s.losses || 0;
-    existing.hoursPlayed += parseFloat(s.hours_played || 0);
+    const recordedHours = Number.parseFloat(s.hours_played || 0);
+    existing.hoursPlayed = name === "Counter-Strike 2" || name === "CS2"
+      ? Math.max(existing.hoursPlayed, recordedHours)
+      : existing.hoursPlayed + recordedHours;
     existing.points += s.points_earned || 0;
     gameStatsMap.set(name, existing);
   }

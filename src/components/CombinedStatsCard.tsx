@@ -60,13 +60,13 @@ const CombinedStatsCard = ({ gameStats }: CombinedStatsCardProps) => {
 
   return (
     <div className="space-y-4">
-      {gameStats.length > 1 && (
+      {gameStats.length > 0 && (
         <Card className="border-primary/30 bg-card/50 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2 text-lg">
                 <Gamepad2 className="h-5 w-5 text-primary" />
-                Combined Stats — All Games
+                Overall Stats — {gameStats.length === 1 ? gameStats[0].gameName : "All Games"}
               </span>
               <span className="flex items-center gap-1.5 text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/30">
                 <Zap className="h-3.5 w-3.5" />
@@ -91,11 +91,12 @@ const CombinedStatsCard = ({ gameStats }: CombinedStatsCardProps) => {
             <div className="rounded-lg border border-border/30 bg-muted/20 p-3 text-xs text-muted-foreground">
               <p className="font-semibold text-foreground mb-1">📊 Score Formula</p>
               <p>
-                Kills ×1 + Wins ×10 + K/D Bonus (50pts/K/D above 1.0) + Win Rate Bonus (3pts/% above 50%) + Hours ×5 + Consistency Bonus
+                Score = kills + (wins × 10) + max(0, K/D − 1) × 50 + max(0, win rate − 50%) × 3 + (hours × 5) + consistency bonus
                 {combinedScore.multiGameMultiplier > 1 && (
                   <span className="text-primary font-semibold"> × {combinedScore.multiGameMultiplier.toFixed(2)} multi-game multiplier</span>
                 )}
               </p>
+              <p className="mt-1">Overall totals add each connected game's recorded kills, deaths, wins, losses, hours, and points. K/D and win rate are recalculated from those totals.</p>
             </div>
           </CardContent>
         </Card>
