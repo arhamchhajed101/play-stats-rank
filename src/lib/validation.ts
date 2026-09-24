@@ -34,6 +34,13 @@ export const ingameIdSchema = z
   .min(1, "In-game ID is required")
   .max(100, "In-game ID is too long");
 
+export const steamIdSchema = z
+  .string()
+  .trim()
+  .min(3, "Enter a SteamID64 or custom profile name")
+  .max(100, "Steam profile ID is too long")
+  .regex(/^(?:\d{17}|[A-Za-z0-9_-]{3,32})$/, "Use a 17-digit SteamID64 or a custom profile name");
+
 export function getValidationError(schema: z.ZodSchema, value: unknown): string | null {
   const result = schema.safeParse(value);
   if (result.success) return null;
