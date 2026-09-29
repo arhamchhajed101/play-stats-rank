@@ -152,7 +152,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      remove_tracked_game: { Args: { p_game_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
