@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3.24.2";
 
 const requestSchema = z.object({
-  steam_id: z.string().trim().min(3).max(100).regex(/^(?:\d{17}|[A-Za-z0-9_-]{3,32})$/),
+  steam_id: z.string().trim().min(3).max(100).regex(/^(?:\d{17}|[A-Za-z0-9_-]{3,32}|(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(?:id|profiles)\/[A-Za-z0-9_-]{3,32}\/?$)/i),
 }).strict();
 
 type RateBucket = { count: number; resetAt: number };
@@ -36,9 +36,13 @@ function requiredEnv(name: string): string {
 
 function normalizeSteamInput(input: string): { steamId64?: string; vanity?: string } {
   const value = input.trim();
-  const urlMatch = value.match(/^(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(?:id|profiles)\/([^/?#]+)\/?$/i);
-  const normalized = urlMatch?.[1] || value;
+  const urlMatch = value.match(/^(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(id|profiles)\/([^/?#]+)\/?$/i);
+  if (urlMatch?.[1].toLowerCase() === "profiles" && /^\d{17}$/.test(urlMatch[2])) {
+    return { steamId64: urlMatch[2] };
+  }
+  const normalized = urlMatch?.[2] || value;
   if (/^\d{17}$/.test(normalized)) return { steamId64: normalized };
+    if (/^profiles\//i.test(normalized)) return { steamId64: normalized.slice("profiles/".length) };
   return { vanity: normalized };
 }
 
@@ -50,7 +54,6 @@ Deno.serve(async (req) => {
     const supabaseUrl = requiredEnv("SUPABASE_URL");
     const anonKey = requiredEnv("SUPABASE_ANON_KEY");
     const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
-    const steamApiKey = requiredEnv("STEAM_API_KEY");
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) return jsonResponse({ error: "Sign in to sync Counter-Strike stats." }, 401);
 
@@ -71,6 +74,7 @@ Deno.serve(async (req) => {
     }
     const parsed = requestSchema.safeParse(rawBody);
     if (!parsed.success) return jsonResponse({ error: "Enter a valid SteamID64 or custom profile name." }, 400);
+    const steamApiKey = requiredEnv("STEAM_API_KEY");
 
     const normalized = normalizeSteamInput(parsed.data.steam_id);
     let steamId64 = normalized.steamId64;

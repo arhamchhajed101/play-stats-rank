@@ -129,12 +129,17 @@ const Dashboard = () => {
       }
     }
 
-    setProfile({
-      id: userId,
-      username: "ShadowStrike",
-      total_points: 2450,
-      created_at: new Date().toISOString(),
-    });
+    const localUser = localStorage.getItem("gamers_tag_demo_user");
+    if (localUser) {
+      try {
+        const parsed = JSON.parse(localUser);
+        setProfile({ id: userId, username: parsed.username || "Gamer", total_points: 0 });
+        return;
+      } catch {
+        // Keep an empty profile rather than showing fabricated stats.
+      }
+    }
+    setProfile({ id: userId, username: "Gamer", total_points: 0 });
   }, []);
 
   const fetchGames = useCallback(async () => {
@@ -260,10 +265,10 @@ const Dashboard = () => {
     };
 
     // Try Supabase insert
-    try {
-      await supabase.from("user_games").insert({ user_id: user.id, game_id: gameId, ingame_id: ingameId });
-    } catch {
-      // Fallback
+    const { error: trackError } = await supabase.from("user_games").insert({ user_id: user.id, game_id: gameId, ingame_id: ingameId });
+    if (trackError && !localStorage.getItem("gamers_tag_demo_user")) {
+      toast({ title: "Could not connect game", description: trackError.message, variant: "destructive" });
+      return;
     }
 
     const updated = [...trackedGames, newTrackedItem];
@@ -326,45 +331,15 @@ const Dashboard = () => {
       // Fallback simulated response for instant responsiveness
     }
 
-    // Smart simulated stats based on Riot ID
-    const [name] = ingameId.split("#");
-    const simulatedElo = 1840 + (name.length * 45) % 300;
-    const kills = 22 + (name.length * 3) % 12;
-    const deaths = 13 + (name.length * 2) % 7;
-    const kd = (kills / deaths).toFixed(2);
-
-    const newStatEntry = {
-      id: `stat-${Date.now()}`,
-      user_id: user?.id || "user",
-      game_id: "game-valorant",
-      kills: kills * 4,
-      deaths: deaths * 4,
-      wins: 3,
-      losses: 1,
-      hours_played: 2.8,
-      points_earned: 340,
-      date: new Date().toISOString(),
-      games: { name: "Valorant" },
-    };
-
-    const updatedStats = [newStatEntry, ...stats];
-    setStats(updatedStats);
-    if (user) {
-      localStorage.setItem(`user_stats_${user.id}`, JSON.stringify(updatedStats));
-    }
-
-    toast({
-      title: "Valorant Stats Live!",
-      description: `Riot ID: ${ingameId} • Rank: Immortal • K/D: ${kd}`,
-    });
+    toast({ title: "Valorant stats unavailable", description: "The stats provider could not verify this Riot ID. No sample stats were added.", variant: "destructive" });
   };
 
   const untrackGame = async (gameId: string) => {
     if (!user) return;
-    try {
-      await supabase.from("user_games").delete().eq("user_id", user.id).eq("game_id", gameId);
-    } catch {
-      // Ignore
+    const { error: removeError } = await supabase.rpc("remove_tracked_game", { p_game_id: gameId });
+    if (removeError && !localStorage.getItem("gamers_tag_demo_user")) {
+      toast({ title: "Could not remove game", description: removeError.message, variant: "destructive" });
+      return;
     }
 
     const updated = trackedGames.filter((tg) => tg.game_id !== gameId);
@@ -458,7 +433,7 @@ const Dashboard = () => {
   }
   const gameStatsArray = Array.from(gameStatsMap.entries()).map(([gameName, data]) => ({ gameName, ...data }));
 
-  const totalHours = activeStats.reduce((sum, stat) => sum + parseFloat(stat.hours_played || 0), 0);
+  const totalHours = gameStatsArray.reduce((sum, game) => sum + game.hoursPlayed, 0);
   const totalKills = activeStats.reduce((sum, stat) => sum + (stat.kills || 0), 0);
   const totalWins = activeStats.reduce((sum, stat) => sum + (stat.wins || 0), 0);
 
@@ -585,9 +560,9 @@ const Dashboard = () => {
                 <GamerScoreCard
                   stats={{
                     kills: totalKills,
-                    deaths: stats.reduce((s, st) => s + (st.deaths || 0), 0),
+                    deaths: activeStats.reduce((s, st) => s + (st.deaths || 0), 0),
                     wins: totalWins,
-                    losses: stats.reduce((s, st) => s + (st.losses || 0), 0),
+                    losses: activeStats.reduce((s, st) => s + (st.losses || 0), 0),
                     hoursPlayed: totalHours,
                     gamesTracked: gameStatsArray.length,
                   }}
