@@ -36,8 +36,11 @@ function requiredEnv(name: string): string {
 
 function normalizeSteamInput(input: string): { steamId64?: string; vanity?: string } {
   const value = input.trim();
-  const urlMatch = value.match(/^(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(?:id|profiles)\/([^/?#]+)\/?$/i);
-  const normalized = urlMatch?.[1] || value;
+  const urlMatch = value.match(/^(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(id|profiles)\/([^/?#]+)\/?$/i);
+  if (urlMatch?.[1].toLowerCase() === "profiles" && /^\d{17}$/.test(urlMatch[2])) {
+    return { steamId64: urlMatch[2] };
+  }
+  const normalized = urlMatch?.[2] || value;
   if (/^\d{17}$/.test(normalized)) return { steamId64: normalized };
     if (/^profiles\//i.test(normalized)) return { steamId64: normalized.slice("profiles/".length) };
   return { vanity: normalized };
