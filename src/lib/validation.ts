@@ -39,7 +39,7 @@ export const steamIdSchema = z
   .trim()
   .min(3, "Enter a SteamID64 or custom profile name")
   .max(100, "Steam profile ID is too long")
-  .regex(/^(?:\d{17}|[A-Za-z0-9_-]{3,32})$/, "Use a 17-digit SteamID64 or a custom profile name");
+  .regex(/^(?:\d{17}|[A-Za-z0-9_-]{3,32}|(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(?:id|profiles)\/[A-Za-z0-9_-]{3,32}\/?$)/i, "Use a 17-digit SteamID64, custom profile name, or Steam profile URL");
 
 export function getValidationError(schema: z.ZodSchema, value: unknown): string | null {
   const result = schema.safeParse(value);
