@@ -299,7 +299,19 @@ const Dashboard = () => {
     });
 
     if (error || data?.error) {
-      const detail = data?.error || error?.message || "Steam could not return stats.";
+      let detail = data?.error as string | undefined;
+      if (!detail && error && typeof error === "object" && "context" in error) {
+        const context = error.context;
+        if (context instanceof Response) {
+          try {
+            const body = await context.clone().json() as { error?: string };
+            detail = body.error;
+          } catch {
+            // Keep the SDK message when the function response is not JSON.
+          }
+        }
+      }
+      detail = detail || error?.message || "Steam could not return stats.";
       toast({
         title: "Counter-Strike stats not synced",
         description: detail,

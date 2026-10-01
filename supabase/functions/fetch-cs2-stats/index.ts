@@ -34,6 +34,74 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+function cleanProviderMessage(value: string, apiKey: string): string {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .replaceAll(apiKey, "[redacted]")
+    .trim()
+    .slice(0, 240);
+}
+
+async function fetchSteamJson(
+  url: URL,
+  operation: string,
+  apiKey: string,
+): Promise<{ data: any } | { response: Response }> {
+  let providerResponse: Response;
+  try {
+    providerResponse = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+    return { response: jsonResponse({
+      error: timedOut
+        ? `Steam timed out while ${operation}. Try again shortly.`
+        : `Could not reach Steam while ${operation}. Check the connection and retry.`,
+    }, 502) };
+  }
+
+  let rawBody = "";
+  try {
+    rawBody = await providerResponse.text();
+  } catch {
+    return { response: jsonResponse({ error: `Steam returned an unreadable response while ${operation}.` }, 502) };
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawBody);
+  } catch {
+    const detail = cleanProviderMessage(rawBody, apiKey);
+    const cause = detail
+      ? `Steam returned HTML or invalid data while ${operation}: ${detail}`
+      : `Steam returned HTML or invalid data while ${operation}.`;
+    return { response: jsonResponse({ error: cause }, 502) };
+  }
+
+  if (!providerResponse.ok) {
+    const detail = cleanProviderMessage(
+      typeof data?.error === "string" ? data.error : typeof data?.message === "string" ? data.message : "",
+      apiKey,
+    );
+    const cause = providerResponse.status === 401 || providerResponse.status === 403
+      ? "Steam rejected the API request. Check the server-side Steam API key and permissions."
+      : providerResponse.status === 429
+      ? "Steam is rate-limiting requests. Wait a minute and try again."
+      : `Steam returned HTTP ${providerResponse.status} while ${operation}${detail ? `: ${detail}` : "."}`;
+    return { response: jsonResponse({ error: cause }, providerResponse.status === 429 ? 429 : 502) };
+  }
+
+  return { data };
+}
+
 function normalizeSteamInput(input: string): { steamId64?: string; vanity?: string } {
   const value = input.trim();
   const urlMatch = value.match(/^(?:https?:\/\/)?(?:www\.)?steamcommunity\.com\/(id|profiles)\/([^/?#]+)\/?$/i);
@@ -82,8 +150,9 @@ Deno.serve(async (req) => {
       const vanityUrl = new URL("https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/");
       vanityUrl.searchParams.set("key", steamApiKey);
       vanityUrl.searchParams.set("vanityurl", normalized.vanity);
-      const vanityResponse = await fetch(vanityUrl);
-      const vanityData = await vanityResponse.json();
+      const vanityResult = await fetchSteamJson(vanityUrl, "resolving the custom profile name", steamApiKey);
+      if ("response" in vanityResult) return vanityResult.response;
+      const vanityData = vanityResult.data;
       if (!vanityResponse.ok || vanityData?.response?.success !== 1 || typeof vanityData?.response?.steamid !== "string") {
         return jsonResponse({ error: "Steam profile not found. Check the custom profile name or use a SteamID64." }, 404);
       }
@@ -96,12 +165,12 @@ Deno.serve(async (req) => {
     gamesUrl.searchParams.set("steamid", steamId64);
     gamesUrl.searchParams.set("include_appinfo", "0");
     gamesUrl.searchParams.set("include_played_free_games", "1");
-    const gamesResponse = await fetch(gamesUrl);
-    const gamesData = await gamesResponse.json();
-    if (!gamesResponse.ok) return jsonResponse({ error: "Steam could not provide game details for this profile." }, 502);
+    const gamesResult = await fetchSteamJson(gamesUrl, "loading public game details", steamApiKey);
+    if ("response" in gamesResult) return gamesResult.response;
+    const gamesData = gamesResult.data;
     const cs2 = gamesData?.response?.games?.find((game: { appid?: number }) => game.appid === 730);
     if (!cs2 || typeof cs2.playtime_forever !== "number") {
-      return jsonResponse({ error: "Counter-Strike 2 playtime is unavailable. Make the Steam profile and game details public." }, 404);
+      return jsonResponse({ error: "Steam returned no visible Counter-Strike 2 playtime. Check that the profile and Game Details are public and the account has played CS2." }, 404);
     }
 
     const db = createClient(supabaseUrl, serviceRoleKey);
@@ -136,8 +205,8 @@ Deno.serve(async (req) => {
     const playerUrl = new URL("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/");
     playerUrl.searchParams.set("key", steamApiKey);
     playerUrl.searchParams.set("steamids", steamId64);
-    const playerResponse = await fetch(playerUrl);
-    const playerData = playerResponse.ok ? await playerResponse.json() : null;
+    const playerResult = await fetchSteamJson(playerUrl, "loading the Steam display name", steamApiKey);
+    const playerData = "data" in playerResult ? playerResult.data : null;
     const playerName = playerData?.response?.players?.[0]?.personaname;
 
     return jsonResponse({ success: true, playerName: playerName || "Steam profile", hoursPlayed, steamId64 });
