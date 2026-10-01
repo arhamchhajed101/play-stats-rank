@@ -1,0 +1,3 @@
+- [ ] Harden Counter-Strike sync response parsing, expose provider causes safely, and verify success/error paths.
+- [ ] Apply a clean minimal design across dashboard, game tracking, leaderboard, and login after the visual direction is selected.
+- [ ] Verify the updated screens and current build output.
