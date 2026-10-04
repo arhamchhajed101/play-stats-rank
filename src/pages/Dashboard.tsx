@@ -452,22 +452,19 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto max-w-6xl px-4 py-7">
         
         {/* Welcome Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
+        <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-border pb-5 md:flex-row md:items-center">
           <div>
-            <h1 className="text-4xl font-extrabold tracking-tight mb-2 flex items-center gap-2.5">
-              <span>Welcome, {profile?.username || "Gamer"}</span>
-              <span className="text-xs px-2.5 py-1 rounded-full bg-primary/15 border border-primary/30 text-primary font-mono font-bold">
-                PRO VERIFIED
-              </span>
+            <h1 className="mb-1 flex flex-wrap items-center gap-2 text-3xl font-semibold">
+              <span>Welcome, <span className="text-primary">{profile?.username || "Gamer"}</span></span>
             </h1>
-            <p className="text-muted-foreground">Track your gaming journey, analyze deep combat stats, and climb the ranks</p>
+            <p className="text-sm text-muted-foreground">Your gaming identity, in one place.</p>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <Button onClick={() => setIsLogMatchOpen(true)} className="font-semibold shadow-glow">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setIsLogMatchOpen(true)} className="font-medium">
               <Swords className="h-4 w-4 mr-2" />
               Log Match Stats
             </Button>
@@ -482,56 +479,52 @@ const Dashboard = () => {
         </div>
 
         {/* Top 4 KPI Metric Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-md">
+        <div className="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Card className="rounded-md border-border bg-card/40 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Gamer Points</CardTitle>
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Gamer Points</CardTitle>
               <Trophy className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-extrabold text-primary font-mono">{profile?.total_points || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Global ranking score</p>
+              <div className="font-mono text-2xl font-semibold text-primary">{profile?.total_points || 0}</div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-md">
+          <Card className="rounded-md border-border bg-card/40 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hours Played</CardTitle>
+              <CardTitle className="text-xs font-medium text-muted-foreground">Hours Played</CardTitle>
               <Clock className="h-4 w-4 text-secondary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-extrabold text-secondary font-mono">{totalHours.toFixed(1)}h</div>
-              <p className="text-xs text-muted-foreground mt-1">Across all connected games</p>
+              <div className="font-mono text-2xl font-semibold text-secondary">{totalHours.toFixed(1)}h</div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-md">
+          <Card className="rounded-md border-border bg-card/40 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Kills</CardTitle>
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Kills</CardTitle>
               <Target className="h-4 w-4 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-extrabold text-accent font-mono">{totalKills}</div>
-              <p className="text-xs text-muted-foreground mt-1">Verified combat eliminations</p>
+              <div className="font-mono text-2xl font-semibold text-accent">{totalKills}</div>
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-md">
+          <Card className="rounded-md border-border bg-card/40 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Wins</CardTitle>
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Wins</CardTitle>
               <TrendingUp className="h-4 w-4 text-emerald-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-extrabold text-emerald-400 font-mono">{totalWins}</div>
-              <p className="text-xs text-muted-foreground mt-1">Match victories secured</p>
+              <div className="font-mono text-2xl font-semibold text-secondary">{totalWins}</div>
             </CardContent>
           </Card>
         </div>
 
         {/* Tracked Games Section */}
-        <div className="mb-8">
+        <div className="mb-7">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
               <span>Your Tracked Games</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
                 {trackedGames.length} active
@@ -540,13 +533,13 @@ const Dashboard = () => {
           </div>
 
           {trackedGames.length === 0 ? (
-            <Card className="border-border/50 bg-card/50 backdrop-blur-sm p-8 text-center">
-              <Plus className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">You're not tracking any games yet</p>
-              <p className="text-sm text-muted-foreground">Add games below to start tracking your stats</p>
+            <Card className="rounded-md border-border border-dashed bg-transparent p-7 text-center shadow-none">
+              <Plus className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+              <p className="mb-1 text-sm font-medium">You're not tracking any games yet</p>
+              <p className="text-sm text-muted-foreground">Add games below to start tracking your stats.</p>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {trackedGames.map((tg) => (
                 <GameCard
                   key={tg.id}
@@ -563,7 +556,7 @@ const Dashboard = () => {
         {/* Gamer Score & Per-game Stats */}
         {gameStatsArray.length > 0 && (
           <div className="mb-8 space-y-6">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
               <Zap className="h-6 w-6 text-primary" />
               <span>Identity & Performance Breakdown</span>
             </h2>
@@ -590,7 +583,7 @@ const Dashboard = () => {
         {/* Valorant Detailed Tracker */}
         {trackedGames.some((tg) => tg.games?.name === "Valorant") && (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
               <Sparkles className="h-5 w-5 text-primary" />
               <span>Valorant Combat Hub</span>
             </h2>
@@ -610,8 +603,8 @@ const Dashboard = () => {
 
         {/* Available Games Catalog */}
         <div>
-          <h2 className="text-2xl font-bold mb-4">Available Games Catalog</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <h2 className="mb-3 text-lg font-semibold">Available Games</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {games
               .filter((game) => !trackedGames.some((tg) => tg.game_id === game.id))
               .map((game) => (
@@ -638,7 +631,7 @@ const Dashboard = () => {
 
       {/* Log Match Stats Dialog */}
       <Dialog open={isLogMatchOpen} onOpenChange={setIsLogMatchOpen}>
-        <DialogContent className="sm:max-w-md bg-card/90 backdrop-blur-xl border-border/60">
+          <DialogContent className="rounded-lg border-border bg-card sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Swords className="h-5 w-5 text-primary" />
@@ -653,7 +646,7 @@ const Dashboard = () => {
             <div className="space-y-1.5">
               <Label>Select Game</Label>
               <Select value={logGameId} onValueChange={setLogGameId} required>
-                <SelectTrigger className="bg-background/50">
+              <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Choose game..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -680,7 +673,7 @@ const Dashboard = () => {
                   min="0"
                   value={logKills}
                   onChange={(e) => setLogKills(e.target.value)}
-                  className="bg-background/50"
+                  className="bg-background"
                   required
                 />
               </div>
@@ -691,7 +684,7 @@ const Dashboard = () => {
                   min="0"
                   value={logDeaths}
                   onChange={(e) => setLogDeaths(e.target.value)}
-                  className="bg-background/50"
+                  className="bg-background"
                   required
                 />
               </div>
@@ -705,7 +698,7 @@ const Dashboard = () => {
                   min="0"
                   value={logWins}
                   onChange={(e) => setLogWins(e.target.value)}
-                  className="bg-background/50"
+                  className="bg-background"
                   required
                 />
               </div>
@@ -716,7 +709,7 @@ const Dashboard = () => {
                   min="0"
                   value={logLosses}
                   onChange={(e) => setLogLosses(e.target.value)}
-                  className="bg-background/50"
+                  className="bg-background"
                   required
                 />
               </div>
@@ -728,7 +721,7 @@ const Dashboard = () => {
                   min="0.1"
                   value={logHours}
                   onChange={(e) => setLogHours(e.target.value)}
-                  className="bg-background/50"
+                  className="bg-background"
                   required
                 />
               </div>
@@ -738,7 +731,7 @@ const Dashboard = () => {
               <Button type="button" variant="outline" onClick={() => setIsLogMatchOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!logGameId} className="font-bold shadow-glow">
+              <Button type="submit" disabled={!logGameId} className="font-medium">
                 Save & Update Score
               </Button>
             </DialogFooter>

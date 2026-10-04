@@ -24,7 +24,7 @@ function StatBox({ icon: Icon, label, value, sub, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-lg border ${highlight ? "bg-primary/10 border-primary/30" : "bg-muted/30 border-border/20"}`}>
+    <div className={`flex items-center gap-3 rounded-md border p-3 ${highlight ? "bg-primary/10 border-primary/30" : "bg-muted/20 border-border"}`}>
       <Icon className={`h-5 w-5 shrink-0 ${highlight ? "text-primary" : "text-muted-foreground"}`} />
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
@@ -61,14 +61,14 @@ const CombinedStatsCard = ({ gameStats }: CombinedStatsCardProps) => {
   return (
     <div className="space-y-4">
       {gameStats.length > 0 && (
-        <Card className="border-primary/30 bg-card/50 backdrop-blur-sm">
-          <CardHeader>
+        <Card className="rounded-md border-border bg-card/40 shadow-none">
+          <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-lg">
+                <span className="flex items-center gap-2 text-base font-semibold">
                 <Gamepad2 className="h-5 w-5 text-primary" />
                 Overall Stats — {gameStats.length === 1 ? gameStats[0].gameName : "All Games"}
               </span>
-              <span className="flex items-center gap-1.5 text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/30">
+              <span className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
                 <Zap className="h-3.5 w-3.5" />
                 {combinedScore.total.toLocaleString()} pts
                 {combinedScore.multiGameMultiplier > 1 && (
@@ -88,8 +88,8 @@ const CombinedStatsCard = ({ gameStats }: CombinedStatsCardProps) => {
             </div>
 
             {/* Formula info */}
-            <div className="rounded-lg border border-border/30 bg-muted/20 p-3 text-xs text-muted-foreground">
-              <p className="font-semibold text-foreground mb-1">📊 Score Formula</p>
+            <div className="rounded-md border border-border bg-background/60 p-3 text-xs text-muted-foreground">
+              <p className="mb-1 font-semibold text-foreground">Score formula</p>
               <p>
                 Score = kills + (wins × 10) + max(0, K/D − 1) × 50 + max(0, win rate − 50%) × 3 + (hours × 5) + consistency bonus
                 {combinedScore.multiGameMultiplier > 1 && (
@@ -115,7 +115,7 @@ const CombinedStatsCard = ({ gameStats }: CombinedStatsCardProps) => {
         });
 
         return (
-          <Card key={gs.gameName} className="border-border/30 bg-card/50 backdrop-blur-sm">
+          <Card key={gs.gameName} className="rounded-md border-border bg-card/40 shadow-none">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center justify-between text-base">
                 <span>{gs.gameName} Stats</span>
