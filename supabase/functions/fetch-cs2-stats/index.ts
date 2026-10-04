@@ -153,7 +153,7 @@ Deno.serve(async (req) => {
       const vanityResult = await fetchSteamJson(vanityUrl, "resolving the custom profile name", steamApiKey);
       if ("response" in vanityResult) return vanityResult.response;
       const vanityData = vanityResult.data;
-      if (!vanityResponse.ok || vanityData?.response?.success !== 1 || typeof vanityData?.response?.steamid !== "string") {
+      if (vanityData?.response?.success !== 1 || typeof vanityData?.response?.steamid !== "string") {
         return jsonResponse({ error: "Steam profile not found. Check the custom profile name or use a SteamID64." }, 404);
       }
       steamId64 = vanityData.response.steamid;
