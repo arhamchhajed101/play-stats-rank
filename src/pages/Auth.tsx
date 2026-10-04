@@ -218,19 +218,20 @@ const Auth = () => {
       : "Enter your email to receive a reset link";
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="w-full max-w-md border-border/50 bg-card/50 backdrop-blur-sm shadow-xl">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center shadow-lg">
-              <Gamepad2 className="h-9 w-9 text-primary" style={{ filter: "drop-shadow(var(--shadow-glow))" }} />
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-10">
+      <Card className="w-full max-w-md overflow-hidden rounded-lg border-border bg-card/60 shadow-none">
+        <CardHeader className="space-y-2 px-7 pt-7">
+          <div className="mb-2 flex justify-center">
+            <div className="flex h-11 w-11 items-center justify-center rounded-md border border-border bg-background">
+              <Gamepad2 className="h-5 w-5 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center font-extrabold">{modeTitle}</CardTitle>
+          <p className="text-center text-xs font-semibold uppercase tracking-widest text-primary">Gamers Tag</p>
+          <CardTitle className="text-center text-2xl font-semibold">{modeTitle}</CardTitle>
           <CardDescription className="text-center">{modeDesc}</CardDescription>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="px-7 pb-7">
           <form onSubmit={handleAuth} className="space-y-4" noValidate>
             {mode === "signup" && (
               <div className="space-y-2">
@@ -280,7 +281,7 @@ const Auth = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
@@ -298,7 +299,7 @@ const Auth = () => {
                 <button
                   type="button"
                   onClick={() => setMode("forgot")}
-                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  className="text-sm text-muted-foreground transition-colors hover:text-primary"
                 >
                   Forgot password?
                 </button>
@@ -313,7 +314,7 @@ const Auth = () => {
               </div>
             )}
 
-            <Button type="submit" className="w-full font-bold" disabled={loading}>
+            <Button type="submit" className="w-full font-semibold" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -329,12 +330,12 @@ const Auth = () => {
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-5 border-t border-border pt-4 text-center text-sm">
             {mode !== "forgot" ? (
               <button
                 type="button"
                 onClick={() => setMode(mode === "login" ? "signup" : "login")}
-                className="text-primary hover:underline font-medium"
+                className="font-medium text-primary hover:underline"
               >
                 {mode === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
               </button>
@@ -342,7 +343,7 @@ const Auth = () => {
               <button
                 type="button"
                 onClick={() => setMode("login")}
-                className="text-primary hover:underline font-medium"
+                className="font-medium text-primary hover:underline"
               >
                 ← Back to sign in
               </button>
