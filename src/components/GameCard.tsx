@@ -17,47 +17,32 @@ interface GameCardProps {
 
 const GameCard = ({ game, isTracked, onToggle, ingameId }: GameCardProps) => {
   return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden hover:border-primary/50 transition-colors group">
-      <div className="aspect-video relative overflow-hidden">
+    <Card className="overflow-hidden rounded-md border-border bg-card/40 shadow-none transition-colors hover:border-primary/50 group">
+      <div className="flex items-center gap-3 p-3.5">
         <img
           src={game.image_url || "/placeholder.svg"}
           alt={game.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="h-12 w-12 shrink-0 rounded-md border border-border object-cover transition-colors group-hover:border-primary/30"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
-      </div>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-lg">{game.name}</CardTitle>
-            <Badge variant="secondary" className="mt-2">
-              {game.category}
-            </Badge>
-            {ingameId && (
-              <p className="text-xs text-muted-foreground mt-1 truncate">ID: {ingameId}</p>
-            )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <CardTitle className="truncate text-sm font-semibold">{game.name}</CardTitle>
+            {isTracked && <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] font-medium">Tracking</Badge>}
           </div>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{game.category}</p>
+          {ingameId && <p className="mt-1 truncate text-[11px] text-muted-foreground/80">ID: {ingameId}</p>}
         </div>
-      </CardHeader>
-      <CardContent>
         <Button
           onClick={onToggle}
           variant={isTracked ? "outline" : "default"}
-          className="w-full"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          aria-label={isTracked ? `Remove ${game.name}` : `Track ${game.name}`}
+          title={isTracked ? "Remove tracking" : "Track game"}
         >
-          {isTracked ? (
-            <>
-              <Minus className="h-4 w-4 mr-2" />
-              Remove
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              Track
-            </>
-          )}
+          {isTracked ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
         </Button>
-      </CardContent>
+      </div>
     </Card>
   );
 };

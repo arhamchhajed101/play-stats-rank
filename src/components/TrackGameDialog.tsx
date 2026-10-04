@@ -45,12 +45,12 @@ const TrackGameDialog = ({ open, onClose, gameName, onConfirm }: TrackGameDialog
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="rounded-lg border-border bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Track {gameName}</DialogTitle>
           <DialogDescription>
             {gameName === "Counter-Strike 2"
-              ? "Enter your 17-digit SteamID64 or custom profile name. Your Steam profile and game details must be public to sync playtime."
+              ? "Enter your 17-digit SteamID64 or custom profile name. Your Steam profile and Game Details must be public to sync playtime."
               : "Enter your in-game ID so we can automatically fetch your stats."}
           </DialogDescription>
         </DialogHeader>

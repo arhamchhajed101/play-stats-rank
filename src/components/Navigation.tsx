@@ -27,14 +27,14 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="border-b border-border/50 bg-card/40 backdrop-blur-xl sticky top-0 z-50 shadow-md">
-      <div className="container mx-auto px-4 py-3.5">
+    <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-md">
+      <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center group-hover:scale-105 transition-transform shadow-sm">
-              <Gamepad2 className="h-5 w-5 text-primary" style={{ filter: "drop-shadow(var(--shadow-glow))" }} />
+            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card transition-colors group-hover:border-primary/50">
+              <Gamepad2 className="h-4 w-4 text-primary" />
             </div>
-            <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-foreground via-foreground to-primary/90 bg-clip-text">
+            <span className="text-lg font-bold text-foreground">
               Gamers Tag
             </span>
           </Link>
@@ -43,7 +43,7 @@ const Navigation = () => {
             <Button
               variant={location.pathname === "/dashboard" ? "default" : "ghost"}
               size="sm"
-              className={location.pathname === "/dashboard" ? "shadow-glow font-bold" : "text-muted-foreground hover:text-foreground"}
+              className={location.pathname === "/dashboard" ? "font-semibold" : "text-muted-foreground hover:text-foreground"}
               asChild
             >
               <Link to="/dashboard">
@@ -54,7 +54,7 @@ const Navigation = () => {
             <Button
               variant={location.pathname === "/profile" ? "default" : "ghost"}
               size="sm"
-              className={location.pathname === "/profile" ? "shadow-glow font-bold" : "text-muted-foreground hover:text-foreground"}
+              className={location.pathname === "/profile" ? "font-semibold" : "text-muted-foreground hover:text-foreground"}
               asChild
             >
               <Link to="/profile">
@@ -65,7 +65,7 @@ const Navigation = () => {
             <Button
               variant={location.pathname === "/leaderboard" ? "default" : "ghost"}
               size="sm"
-              className={location.pathname === "/leaderboard" ? "shadow-glow font-bold" : "text-muted-foreground hover:text-foreground"}
+              className={location.pathname === "/leaderboard" ? "font-semibold" : "text-muted-foreground hover:text-foreground"}
               asChild
             >
               <Link to="/leaderboard">
