@@ -81,9 +81,9 @@ async function fetchSteamJson(
   } catch {
     const detail = cleanProviderMessage(rawBody, apiKey);
     const cause = providerResponse.status === 401 || providerResponse.status === 403
-      ? "Steam rejected the request. Verify the server-side Steam API key and confirm it is active."
+      ? `Steam rejected the request (HTTP ${providerResponse.status}). Verify the server-side Steam API key and confirm it is active.${detail ? ` Steam response: ${detail}` : ""}`
       : providerResponse.status === 429
-      ? "Steam is rate-limiting requests. Wait a minute and try again."
+      ? `Steam is rate-limiting requests. Wait a minute and try again.${detail ? ` Steam response: ${detail}` : ""}`
       : detail
       ? `Steam returned HTML or invalid data while ${operation}: ${detail}`
       : `Steam returned HTML or invalid data while ${operation} (HTTP ${providerResponse.status}).`;

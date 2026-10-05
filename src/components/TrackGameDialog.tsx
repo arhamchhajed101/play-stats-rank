@@ -45,7 +45,7 @@ const TrackGameDialog = ({ open, onClose, gameName, onConfirm }: TrackGameDialog
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="rounded-lg border-border bg-card sm:max-w-md">
+      <DialogContent className="rounded-md border-border bg-card sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Track {gameName}</DialogTitle>
           <DialogDescription>
