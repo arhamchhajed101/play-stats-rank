@@ -10,12 +10,12 @@ interface GamerScoreCardProps {
 }
 
 const breakdownItems = [
-  { key: "killPoints" as const, label: "Kill Points", desc: "1 pt per kill", icon: Target, color: "text-rose-400" },
-  { key: "winPoints" as const, label: "Win Points", desc: "10 pts per win", icon: Trophy, color: "text-yellow-400" },
-  { key: "kdBonus" as const, label: "K/D Bonus", desc: "50 pts per K/D above 1.0", icon: Swords, color: "text-orange-400" },
-  { key: "winRateBonus" as const, label: "Win Rate Bonus", desc: "3 pts per % above 50%", icon: TrendingUp, color: "text-green-400" },
-  { key: "playtimePoints" as const, label: "Playtime Points", desc: "5 pts per hour", icon: Clock, color: "text-blue-400" },
-  { key: "consistencyBonus" as const, label: "Consistency Bonus", desc: "Bonus for 5–50+ matches played", icon: Star, color: "text-purple-400" },
+  { key: "killPoints" as const, label: "Kill Points", desc: "1 pt per kill", icon: Target },
+  { key: "winPoints" as const, label: "Win Points", desc: "10 pts per win", icon: Trophy },
+  { key: "kdBonus" as const, label: "K/D Bonus", desc: "50 pts per K/D above 1.0", icon: Swords },
+  { key: "winRateBonus" as const, label: "Win Rate Bonus", desc: "3 pts per % above 50%", icon: TrendingUp },
+  { key: "playtimePoints" as const, label: "Playtime Points", desc: "5 pts per hour", icon: Clock },
+  { key: "consistencyBonus" as const, label: "Consistency Bonus", desc: "Bonus for 5–50+ matches played", icon: Star },
 ];
 
 const GamerScoreCard = ({ stats }: GamerScoreCardProps) => {
@@ -39,25 +39,24 @@ const GamerScoreCard = ({ stats }: GamerScoreCardProps) => {
     : 100;
 
   return (
-    <Card className="border-primary/30 bg-card/60 backdrop-blur-sm overflow-hidden relative">
-      <div className={`absolute inset-0 bg-gradient-to-br ${tier.color} opacity-5`} />
-      <CardHeader className="relative z-10">
+    <Card className="overflow-hidden rounded-md border-border bg-card/40 shadow-none">
+      <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
             Gamer Score
           </span>
-          <Badge className={`bg-gradient-to-r ${tier.color} text-white border-0 shadow-md`}>
+          <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
             {tier.label}
           </Badge>
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="relative z-10 space-y-5">
+      <CardContent className="space-y-5">
         {/* Big score */}
         <div className="text-center">
           <motion.div
-            className="text-5xl font-extrabold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
+            className="font-mono text-4xl font-semibold tabular-nums text-primary"
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.6, type: "spring" }}
@@ -67,7 +66,7 @@ const GamerScoreCard = ({ stats }: GamerScoreCardProps) => {
           <p className="text-sm text-muted-foreground mt-1">Combined across all games</p>
 
           {/* Quick stats */}
-          <div className="flex justify-center gap-4 mt-3 text-xs text-muted-foreground">
+          <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Swords className="h-3 w-3" />
               K/D: <strong className="text-foreground ml-1">{breakdown.kd.toFixed(2)}</strong>
@@ -109,14 +108,14 @@ const GamerScoreCard = ({ stats }: GamerScoreCardProps) => {
               <div key={item.key} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-2">
-                    <item.icon className={`h-4 w-4 ${item.color}`} />
+                    <item.icon className="h-4 w-4 text-muted-foreground" />
                     {item.label}
                   </span>
                   <span className="font-semibold tabular-nums">{value.toLocaleString()}</span>
                 </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                   <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-primary to-secondary"
+                    className="h-full rounded-full bg-primary"
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
                     transition={{ duration: 0.8, delay: 0.3 }}
@@ -130,7 +129,7 @@ const GamerScoreCard = ({ stats }: GamerScoreCardProps) => {
 
         {/* Multi-game multiplier */}
         {breakdown.multiGameMultiplier > 1 && (
-          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 p-3">
+          <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 p-3">
             <Gamepad2 className="h-4 w-4 text-primary shrink-0" />
             <div className="text-sm">
               <span className="font-semibold text-primary">Multi-Game Bonus ×{breakdown.multiGameMultiplier.toFixed(2)}</span>

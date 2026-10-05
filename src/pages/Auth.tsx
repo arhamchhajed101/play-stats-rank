@@ -219,7 +219,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4 py-10">
-      <Card className="w-full max-w-md overflow-hidden rounded-lg border-border bg-card/60 shadow-none">
+      <Card className="w-full max-w-md overflow-hidden rounded-md border-border bg-card/60 shadow-none">
         <CardHeader className="space-y-2 px-7 pt-7">
           <div className="mb-2 flex justify-center">
             <div className="flex h-11 w-11 items-center justify-center rounded-md border border-border bg-background">
